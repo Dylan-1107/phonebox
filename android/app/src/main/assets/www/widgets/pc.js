@@ -1,4 +1,4 @@
-import { $, API, D, curPage, pages, PANEL_HEADERS, LOCALE, Q_STYLE, api, bridge, cfg, color, cssVar, rulesPaused, toggleRulesPause, fillIcon, fmtDur, fmtHM, fmtMem, gotoPageRef, gpuMem, gpusOf, h, en, haptic, icon, openSheet, paceInfo, pad, pairedPcs, quotaProviders, r1, shortDur, shortGpu, store, switchPc, t, tick, toast, transport, emo, labelled, rich, tp, tpv, quotaText } from '../main.js';
+import { $, API, D, curPage, pages, PANEL_HEADERS, PREVIEW, LOCALE, Q_STYLE, api, bridge, cfg, cfgVersion, configMark, configReadSince, localWriteStored, loadConfig, color, cssVar, rulesPaused, toggleRulesPause, fillIcon, fmtDur, fmtHM, fmtMem, gotoPageRef, gpuMem, gpusOf, h, en, haptic, icon, openSheet, paceInfo, pad, pairedPcs, quotaProviders, r1, shortDur, shortGpu, store, switchPc, t, tick, toast, transport, emo, labelled, rich, tp, tpv, quotaText } from '../main.js';
 import { W } from '../registry.js';
 import { canKillAnywhere, dialEl, every } from './helpers.js';
 
@@ -133,9 +133,38 @@ W.obs = {
 // voice channels to join and recent notifications. Buttons only work when the widget allows control.
 W.discord = {
   needs: ['tick', 'fast'],
-  create(box, { o, page }) {
+  create(box, { o, page, w }) {
     let data = null, lastKey = '', busy = null;
     const open = new Set(); // servers whose channels are unfolded
+    // Favourite servers and voice channels, picked on the phone (★): saved in this widget's options on the computer.
+    // A widget inside a Smart Stack or a preview has no saved place of its own to write to.
+    let editing = false;
+    const canEdit = !PREVIEW && !!w && !String(w.id).includes(':') && !!page?.id;
+    // like the agent (DiscordFavorites.Read): text only, each id once, at most 30
+    const favs = (key) => (Array.isArray(o[key]) ? [...new Set(o[key].filter((x) => typeof x === 'string' && x))].slice(0, 30) : []);
+    let saving = false; // one save at a time: each one carries the settings version the previous one produced
+    const fav = async (kind, id, on) => {
+      if (saving) return;
+      // without a settings version from the computer, what is on screen may be an old copy: nothing is written over it
+      if (cfgVersion == null) { toast(t('w.discord.favFailed'), 'err'); return; }
+      saving = true;
+      const key = kind === 'guild' ? 'favGuilds' : 'favChannels';
+      haptic(); render(true);
+      try {
+        const mark = configMark();
+        const r = await api('/widget/' + encodeURIComponent(page.id) + '/' + encodeURIComponent(w.id) + '/discord-favorite?kind=' + kind
+          + '&id=' + encodeURIComponent(id) + '&on=' + on + '&version=' + encodeURIComponent(cfgVersion), 'POST', 8000);
+        const list = favs(key).filter((x) => x !== id);
+        o[key] = on ? [...list, id] : list;
+        // keep the panel's own copy of the settings in step, so the saved version doesn't rebuild the page (as Note does)
+        if (!configReadSince(mark)) {
+          const saved = (cfg.pages || []).find((p) => p.id === page.id)?.widgets?.find((x) => x.id === w.id);
+          if (saved) { saved.options = { ...(saved.options || {}), [key]: o[key] }; store.set('cfg', cfg); }
+          localWriteStored(r?.version);
+        } else await loadConfig(); // a read applied during the save may be from before it: the next save needs the version of this one
+      } catch (e) { toast(t(e?.status === 409 ? 'w.discord.favChanged' : 'w.discord.favFailed'), 'err'); }
+      saving = false; render(true);
+    };
     // a round logo: the image once it has loaded, the first letter until then (and when there is no image)
     const ico = (src, name) => {
       const w = h('span', 'dc-ico', (name || '?').trim().charAt(0).toUpperCase() || '?');
@@ -162,7 +191,7 @@ W.discord = {
     const render = (force = false) => {
       const s0 = data?.snapshot;
       const quiet = s0?.members ? { ...data, snapshot: { ...s0, members: s0.members.map(({ speaking, ...m }) => m) } } : data;
-      const key = JSON.stringify([quiet, busy, [...open], box.clientHeight]);
+      const key = JSON.stringify([quiet, busy, [...open], box.clientHeight, editing, saving, o.favGuilds, o.favChannels]);
       if (!force && key === lastKey) { ring(); return; }
       lastKey = key;
       rings.clear();
@@ -171,9 +200,12 @@ W.discord = {
       const s = data.snapshot;
       if (!s.connected) { box.replaceChildren(h('div', 'w-title', en('Discord')), h('div', 'empty', s.error || t('panel.connecting'))); return; }
       const ctl = data.control;
+      // Push to talk counts as "on" for the input mode button: it is the mode where you are silent until you press a key.
+      const ptt = s.inputMode === 'PUSH_TO_TALK';
       const btn = (cls, label, on, action) => {
         const b = labelled(h('button', 'dc-btn ' + cls + (on ? ' on' : '') + (busy === action ? ' busy' : ''), label),
-          t({ mute: on ? 'w.a.unmuteMic' : 'w.a.muteMic', deafen: on ? 'w.a.undeafen' : 'w.a.deafen', leave: 'w.a.leave' }[action]));
+          t({ mute: on ? 'w.a.unmuteMic' : 'w.a.muteMic', deafen: on ? 'w.a.undeafen' : 'w.a.deafen', leave: 'w.a.leave',
+            inputmode: on ? 'w.a.useVoiceActivity' : 'w.a.usePushToTalk' }[action]));
         if (ctl && !busy) b.addEventListener('click', () => act(action)); else b.disabled = true;
         return b;
       };
@@ -181,7 +213,10 @@ W.discord = {
         h('span', 'dc-where', s.channelName ? `${s.channelName}` : t('w.discord.notInChannel')),
         s.channelKind ? h('span', 'dc-kind', s.channelKind) : null,
         btn('mute', emo(s.muted ? '🔇' : '🎙️'), s.muted, 'mute'), btn('deaf', emo(s.deafened ? '🔕' : '🎧'), s.deafened, 'deafen'),
+        s.inputMode ? btn('mode', emo(ptt ? '✋' : '🗣️'), ptt, 'inputmode') : null,
         s.channelId ? btn('leave', emo('📞'), false, 'leave') : null)];
+      // Push to talk without a key in Discord: nobody hears you, and nothing else on screen says so.
+      if (ptt && !s.pttKey) kids.push(h('div', 'dc-warn', t('w.discord.pttNoKey')));
       if (s.channelId && s.members.length) {
         kids.push(h('div', 'dc-members', ...s.members.map((m) => {
           const chip = h('span', 'dc-member' + (m.deafened ? ' deaf' : m.muted ? ' muted' : '') + (m.speaking ? ' speaking' : ''), ico(m.avatar && img('user', m.id, m.avatar), m.name), rich((m.deafened ? '🔕 ' : m.muted ? '🔇 ' : '') + m.name));
@@ -192,30 +227,71 @@ W.discord = {
       if (o.channels !== false && s.channels.length) {
         // one block per server; tap it to unfold its voice channels (the server you are in starts unfolded)
         // grouped by server id, not by name: two servers can have the same name
+        const favG = favs('favGuilds'), favC = favs('favChannels');
+        // favourites Discord doesn't list (you left the server, or a hand-edited list) filter nothing: with only those, all show
+        const filtered = !editing && s.channels.some((c) => favG.includes(c.guildId) || favC.includes(c.id));
         const servers = new Map();
         for (const c of s.channels) {
           const gid = c.guildId || c.guild || 'other';
           if (!servers.has(gid)) servers.set(gid, []);
           servers.get(gid).push(c);
         }
-        kids.push(h('div', 'dc-servers', ...[...servers].map(([gid, chans]) => {
+        // With favourites, only favourite servers (and servers holding a favourite channel, or the channel you are in)
+        // show, and a server with favourite channels shows only those, plus the one you are in.
+        const visibleServers = [...servers].filter(([gid, chans]) => !filtered || favG.includes(gid)
+          || chans.some((c) => favC.includes(c.id) || c.id === s.channelId))
+          .map(([gid, chans]) => {
+            const starred = chans.filter((c) => favC.includes(c.id) || c.id === s.channelId);
+            return [gid, filtered && chans.some((c) => favC.includes(c.id)) ? starred : chans];
+          });
+        if (canEdit) {
+          const tgl = h('button', 'dc-favbtn' + (editing ? ' on' : ''), editing ? t('w.discord.done') : '★ ' + t('w.discord.favorites'));
+          tgl.addEventListener('click', () => { haptic(); editing = !editing; render(true); });
+          kids.push(h('div', 'dc-favbar', editing ? h('span', 'dc-favhint', t('w.discord.favHint')) : null, tgl));
+        }
+        const star = (kind, id, on) => {
+          const b = labelled(h('button', 'dc-star' + (on ? ' on' : ''), on ? '★' : '☆'), t(on ? 'w.discord.removeFav' : 'w.discord.addFav'));
+          if (saving) b.disabled = true;
+          b.addEventListener('click', (e) => { e.stopPropagation(); fav(kind, id, !on); });
+          return b;
+        };
+        // favourites Discord doesn't list right now have no row of their own below: here they can still be removed
+        if (editing) {
+          const gone = [...favG.filter((id) => s.channels.every((c) => c.guildId !== id)).map((id) => ['guild', id]),
+            ...favC.filter((id) => s.channels.every((c) => c.id !== id)).map((id) => ['channel', id])];
+          if (gone.length) {
+            kids.push(h('div', 'dc-gone', ...gone.map(([kind, id]) =>
+              h('div', 'dc-headrow', h('span', 'dc-goneid', id, h('small', null, t('w.discord.favMissing'))), star(kind, id, true)))));
+          }
+        }
+        kids.push(h('div', 'dc-servers', ...visibleServers.map(([gid, chans]) => {
           const here = chans.some((c) => c.id === s.channelId);
           const isOpen = open.has(gid) || (here && !open.has('!' + gid));
           const g = chans[0];
           const name = g.guild || t('w.discord.otherServer');
+          // everyone the agent reported for this server, whichever of its channels this widget shows
+          const inVoice = servers.get(gid).reduce((n, c) => n + (c.people?.length || 0), 0);
           const head = h('button', 'dc-server' + (isOpen ? ' open' : '') + (here ? ' here' : ''), ico(g.guildIcon && g.guildId && img('guild', g.guildId, g.guildIcon), name),
-            h('span', 'dc-stext', h('b', null, name), h('small', null, t(chans.length === 1 ? 'w.discord.channel' : 'w.discord.channels', { n: chans.length }))));
+            h('span', 'dc-stext', h('b', null, name), h('small', null, t(chans.length === 1 ? 'w.discord.channel' : 'w.discord.channels', { n: chans.length }),
+              inVoice ? h('span', 'dc-invoice', ' · 🔊 ' + inVoice) : null)));
           head.addEventListener('click', () => {
             haptic();
             if (isOpen) { open.delete(gid); if (here) open.add('!' + gid); } else { open.add(gid); open.delete('!' + gid); }
             render(true);
           });
-          const block = h('div', 'dc-block' + (isOpen ? ' open' : ''), head);
+          // the star sits next to the server's button, not inside it (a button can't hold another one)
+          const block = h('div', 'dc-block' + (isOpen ? ' open' : '') + (editing ? ' editing' : ''),
+            editing && g.guildId ? h('div', 'dc-headrow', head, star('guild', g.guildId, favG.includes(g.guildId))) : head);
           if (isOpen) {
             block.append(h('div', 'dc-chans', ...chans.map((c) => {
               const b = h('button', 'dc-chan' + (c.id === s.channelId ? ' cur' : '') + (busy === 'join' + c.id ? ' busy' : ''), rich('🔊 ' + c.name));
-              if (ctl && !busy && c.id !== s.channelId) b.addEventListener('click', () => act('join', c.id));
-              return b;
+              if (!editing && ctl && !busy && c.id !== s.channelId) b.addEventListener('click', () => act('join', c.id));
+              else if (editing) b.disabled = true;
+              // who is in the channel (the agent reads it for favourites only)
+              const people = c.people?.length ? h('div', 'dc-people', ...c.people.map((m) =>
+                h('span', 'dc-person' + (m.deafened ? ' deaf' : m.muted ? ' muted' : ''), ico(m.avatar && img('user', m.id, m.avatar), m.name),
+                  rich((m.deafened ? '🔕 ' : m.muted ? '🔇 ' : '') + m.name)))) : null;
+              return h('div', 'dc-room', editing ? h('div', 'dc-headrow', b, star('channel', c.id, favC.includes(c.id))) : b, people);
             })));
           }
           return block;

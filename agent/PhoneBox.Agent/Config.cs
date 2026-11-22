@@ -190,6 +190,10 @@ public sealed class DisplayConfig
     public bool AutoBrightness { get; set; }
     /// <summary>Show the night screen whenever the room is dark, not only at night.</summary>
     public bool NightWhenDark { get; set; }
+    /// <summary>Show the night screen after the paired computer's agent has been unreachable for a while.</summary>
+    public bool NightWhenUnreachable { get; set; }
+    /// <summary>Minutes to wait after the agent becomes unreachable before showing the night screen.</summary>
+    public int UnreachableNightDelayMin { get; set; } = 5;
     /// <summary>A hand near the phone (proximity sensor) wakes the night screen.</summary>
     public bool ProximityWake { get; set; } = true;
     /// <summary>OLED burn-in protection: every 2 minutes the panel moves by a few pixels and the night clock drifts.</summary>
@@ -405,6 +409,12 @@ public sealed class DiscordConfig
     public bool Enabled { get; set; }
     public string? ClientId { get; set; }
     public string? ClientSecret { get; set; }
+    /// <summary>
+    /// Allow mute, deafen, leave and join through <c>/api/discord/{action}</c> without a Discord widget: for shortcuts,
+    /// scripts and custom widgets. Off by default; then only a Discord widget with its <c>control</c> option on, on an
+    /// enabled page, allows them.
+    /// </summary>
+    public bool AllowControl { get; set; }
 }
 
 public sealed class SteamConfig
@@ -621,11 +631,17 @@ public sealed partial class ConfigStore(string path)
         foreach (var action in c.Controls.Actions) { action.Target ??= ""; action.Kind ??= "shortcut"; action.Label ??= action.Id; }
         c.Controls.Profiles = c.Controls.Profiles.Where(p => p is not null && !string.IsNullOrWhiteSpace(p.Id)).DistinctBy(p => p.Id).Take(128).ToList();
         foreach (var profile in c.Controls.Profiles) { profile.Levels = (profile.Levels ?? []).Where(l => l is not null).Take(512).ToList(); profile.Defaults ??= []; profile.Actions = (profile.Actions ?? []).Where(a => !string.IsNullOrEmpty(a)).Take(64).ToList(); profile.Label ??= profile.Id; }
+        c.Controls.PlexUrl = PlexControl.NormalizeUrl(c.Controls.PlexUrl);
+        c.Controls.PlexPlayerUrl = PlexControl.NormalizeUrl(c.Controls.PlexPlayerUrl) ?? PlexControl.DefaultPlayerUrl;
+        // a control character (a stray newline from a paste) can't be part of a token, and would break the request header
+        c.Controls.PlexToken = new string((c.Controls.PlexToken ?? "").Where(ch => !char.IsControl(ch)).ToArray()).Trim() is { Length: > 0 } plexToken
+            ? Cap(plexToken, 256) : null;
         c.Display ??= new();
         c.Display.Appearance?.Normalize();
         c.Display.Hour12 = Hour12JsonConverter.Normalize(c.Display.Hour12);
         c.Display.IdleReturnSec = Math.Clamp(c.Display.IdleReturnSec, 0, 3600);
         c.Display.IdleDimMin = Math.Clamp(c.Display.IdleDimMin, 0, 1440);
+        c.Display.UnreachableNightDelayMin = Math.Clamp(c.Display.UnreachableNightDelayMin, 1, 30);
         // a language the panel does not have falls back to following the phone / browser. Matched case-insensitively
         // so "PT-br" still resolves, but stored in its canonical casing: i18n.js looks pt-BR up by exact code.
         var lang = (c.Display.Language ?? "").Trim();

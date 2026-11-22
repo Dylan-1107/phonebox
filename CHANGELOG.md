@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+**Widgets**
+- Discord: a button switches Discord between **voice activity** and **push to talk**, keeping your push-to-talk key,
+  delay and sensitivity. When push to talk is on but Discord has no key set (so nobody hears you), the widget says so.
+  It follows the widget's **Control** option like the other buttons and uses the voice scope PhoneBox already asks
+  for (#356, [AlberBM](https://github.com/AlberBM)).
+- Steam library: your installed Steam games with covers, favourites first, then the most recently played, and update
+  progress, read from Steam's own files with no API key, sign-in or network. Starting a game from the phone is a
+  per-widget option, off by default and asking first (#344, #361, [1Cellu](https://github.com/1Cellu)).
+- Synced lyrics: a widget next to Now playing shows the words of the song playing on the computer, the line being
+  sung lit as it plays. The lookup is off by default per widget; with it on, the agent asks LRCLIB (free, no account)
+  with the track's title, artist, album and length, once per song, and keeps the answers in memory only (#339, #378,
+  [1Cellu](https://github.com/1Cellu)).
+- Discord: star servers and voice channels on the phone to keep them at the top, and see who is in your favourite
+  voice channels. The agent reads the starred channels first, then those of favourite servers without starred ones,
+  at most 20 in all, and only while a Discord widget with **Channels** on is on an enabled page (#356, #364,
+  [AlberBM](https://github.com/AlberBM)).
+
 **Agent**
 - Phone app updates: a phone that cannot take a streamed install (`splice failed: EINVAL`, seen with Android 15 on a
   3.10 kernel) is tried once more without streaming, and a phone whose app was updated another way no longer keeps
@@ -11,6 +28,23 @@
   [M00n-of-saturn](https://github.com/M00n-of-saturn)).
 - Display brightness: the slider keeps the level it was set to. It used to jump back to the old level for up to
   30 s, until the agent read the monitor again (#360, [andrii-pavlykivskyi](https://github.com/andrii-pavlykivskyi)).
+- macOS: the CPU and RAM process lists show kernel_task and system processes such as WindowServer, locked against
+  ending them like other protected processes. kernel_task's memory is the system's wired memory, an estimate rather
+  than its own measurement (#388, [ajaybali9](https://github.com/ajaybali9)).
+- Discord: when Discord refuses the login with `Missing "redirect_uri"`, the message says where to add the redirect
+  (`http://127.0.0.1` under **OAuth2 › Redirects** in the Discord application) and that the switch needs **Save** off
+  and on again (#316, #380, [DushyantRajpurohit](https://github.com/DushyantRajpurohit)).
+- Quotas: a CodexBar poll that fails for a moment (Cursor's session can't be read from the background on macOS) no
+  longer blanks the Cursor ring; the last good reading stays for up to 6 hours, without limits that have reset since,
+  and a refresh polls CodexBar again at once (#398, [ajaybali9](https://github.com/ajaybali9)).
+
+**Android app**
+- A request to the agent that fails (a timeout, a dropped cable) now closes its connection at once instead of
+  leaving it for the garbage collector. On Android 6 each one also held two pipes until then, and the system's TLS
+  code stops the app once 1024 are open; this may be behind the crashes in #389
+  ([d3j4n](https://github.com/d3j4n)).
+- A phone whose system can't start the Android System WebView (seen on an OPPO with ColorOS 3.0 on Android 5.1) now
+  shows a message saying so instead of crashing at every launch (#385, [w364439](https://github.com/w364439)).
 - News feeds: tapping a headline opens the article in the browser again on Windows, not an empty File Explorer
   window. explorer.exe mistook some links (long ones, or ones with a query string) for something else; links now go
   to the default browser through Windows' URL handler (#386, #411, [Exrahn](https://github.com/Exrahn),
@@ -20,10 +54,17 @@
 - The Spectrum bars and App console widgets stop asking the PC while nobody can see the panel (screen off, another
   app in front): the spectrum no longer keeps the PC capturing its sound, polling every 40 ms once the live stream was
   closed, and the console no longer asks which app is in front.
+- Night screen while the computer is unreachable: an option on the phone, off by default, dims to the night screen
+  after the agent has answered on no route, USB or Wi-Fi, for a set time (1 to 30 minutes, 5 by default; for
+  example the computer is off or asleep). It ends when the agent answers again, unless the scheduled night screen is
+  on anyway. The **Wake the PC** button stays reachable over it (#347, #357,
+  [CrippledHelix](https://github.com/CrippledHelix)).
 
 **Tools**
 - `tools/demo-server.py` refuses a chunked request body (411) and closes the connection, instead of answering without
   the body and reading it as the next request.
+- The UI tests' web server accepts many connections at once, so the suite no longer fails with refused connections
+  when it runs with several workers on Windows (#405, [DushyantRajpurohit](https://github.com/DushyantRajpurohit)).
 
 **Languages**
 - The weather line no longer shows stray English ("weather condition", "weather forecast") after the condition, and
@@ -31,6 +72,9 @@
   and Ukrainian ("Clear" no longer reads as "Delete", "Showers" as a bathroom shower). A few other broken strings in
   Hindi, Japanese, Korean, Russian, Thai and Ukrainian are fixed, and the release check now catches English left-overs,
   raw bytes and empty translations (#358, [Yura-Kondratiuk](https://github.com/Yura-Kondratiuk)).
+- Arabic: a native speaker went over the whole translation, and the calendar's weekday headings now follow the
+  panel's language in every language instead of always being English (#376,
+  [ahmedalnimr](https://github.com/ahmedalnimr)).
 
 ## 0.9.27 — 2026-11-21
 

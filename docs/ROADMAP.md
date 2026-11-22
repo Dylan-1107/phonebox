@@ -50,6 +50,15 @@ people who proposed or prototyped something are credited in the [changelog](../C
   an opt-in quota source, off by default, that runs `ai-usagebar usage --json` as a fixed command without a shell,
   with a timeout and an output cap, and shows accounts such as `claude@personal` and `claude@work` as separate cards.
   When it fails, the card says so; it never falls back to the built-in readers.
+- **Plex queue and playlists** ([#379](https://github.com/ersinkoc/phonebox/issues/379)) for a Plex Companion player
+  such as Caldera Amp, off by default, in two pull requests: first the settings, the connection and a queue widget,
+  then playlists. The token goes only to the Plex server, and the phone sends ids only.
+- **A white theme and an e-ink option** ([#383](https://github.com/ersinkoc/phonebox/issues/383)), in two pull
+  requests: a pure white theme, then an "E-ink screen" option, off by default, with no pulsing or animations and a
+  slower refresh for fast widgets.
+- **Mics off, camera off** ([#387](https://github.com/ersinkoc/phonebox/issues/387)): an action next to panic that
+  mutes only the microphones and stops the OBS virtual camera. It doesn't touch the physical webcam and says so
+  instead of reporting success.
 
 ## Open for a contributor
 
@@ -70,10 +79,6 @@ Agreed in principle, not being built in-house. Say so on the issue before starti
 - **Night screen as a rule action** ([#330](https://github.com/ersinkoc/phonebox/issues/330)): while a rule holds
   (for example *PC away for 5 minutes*), the phone shows the night screen at its own brightness, and goes back when the
   rule ends. The schedule stays as it is, and a tap still wakes the screen for a while.
-- **Night screen while the computer is unreachable** ([#347](https://github.com/ersinkoc/phonebox/issues/347)): an
-  option on the phone that dims to the night screen after the agent has been out of reach for a few minutes (USB
-  unplugged, the computer off or asleep), and wakes when it answers again. It has to be decided on the phone, since a
-  computer that is off runs no rules; the **Wake the PC** button stays reachable with a tap.
 - **Pushed values without refetching the whole list** ([#329](https://github.com/ersinkoc/phonebox/issues/329)): the
   change event carries the key and its new value, and the phone fetches all of `/api/push` again only when it missed a
   version. A value pushed every second, such as a game's FPS, then costs one small event instead of the full list.

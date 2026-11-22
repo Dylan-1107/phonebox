@@ -13,14 +13,14 @@ public sealed class DiscordTests : IDisposable
 
     public void Dispose() { try { File.Delete(_configPath); } catch { } }
 
-    private DiscordMonitor Monitor(bool? control, bool pageEnabled = true, bool? notifications = null, bool discordEnabled = true)
+    private DiscordMonitor Monitor(bool? control, bool pageEnabled = true, bool? notifications = null, bool discordEnabled = true, bool allowControl = false)
     {
         var options = new Dictionary<string, object>();
         if (control is { } c) options["control"] = c;
         if (notifications is { } n) options["notifications"] = n;
         File.WriteAllText(_configPath, JsonSerializer.Serialize(new
         {
-            discord = new { enabled = discordEnabled, clientId = "1", clientSecret = "s" },
+            discord = new { enabled = discordEnabled, clientId = "1", clientSecret = "s", allowControl },
             // At least one page must stay enabled (the config repairs an all-disabled list), so a second page holds no widgets.
             pages = new[]
             {
@@ -64,6 +64,46 @@ public sealed class DiscordTests : IDisposable
         Assert.True(DiscordMonitor.ControlAllowed(Config()));
     }
 
+    // ---- the global "allow control" switch (for shortcuts and custom widgets) ----
+
+    [Fact]
+    public async Task The_global_switch_allows_control_without_a_widget_option()
+    {
+        var monitor = Monitor(control: null, allowControl: true);
+        Assert.True(DiscordMonitor.ControlAllowed(Config()));
+        // allowed, so the press gets as far as needing a connection
+        Assert.Equal("Discord is not connected", await monitor.ActAsync("mute", null));
+    }
+
+    [Fact]
+    public async Task The_global_switch_also_works_with_the_widget_on_a_hidden_page()
+    {
+        var monitor = Monitor(control: false, pageEnabled: false, allowControl: true);
+        Assert.Equal("Discord is not connected", await monitor.ActAsync("leave", null));
+    }
+
+    [Fact]
+    public void The_global_switch_is_off_by_default()
+    {
+        File.WriteAllText(_configPath, """{"discord":{"enabled":true,"clientId":"1","clientSecret":"s"}}""");
+        var cfg = Config();
+        Assert.False(cfg.Discord.AllowControl);
+        Assert.False(DiscordMonitor.ControlAllowed(cfg));
+    }
+
+    [Theory]
+    [InlineData("config.default.json")]
+    [InlineData("config.default.linux.json")]
+    [InlineData("config.default.macos.json")]
+    public void The_default_settings_ship_with_the_switch_off(string file)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, file);
+        File.Copy(path, _configPath, overwrite: true);
+        var cfg = Config();
+        Assert.False(cfg.Discord.AllowControl);
+        Assert.Contains("\"allowControl\": false", File.ReadAllText(path));
+    }
+
     [Fact]
     public void Snapshot_starts_disconnected_and_empty()
     {
@@ -99,6 +139,60 @@ public sealed class DiscordTests : IDisposable
         monitor.PublishPoll(monitor.VoiceRevision, false, true, Polled());     // the user unmuted in the Discord app itself
         Assert.False(monitor.Snapshot().Muted);
         Assert.True(monitor.Snapshot().Deafened);
+    }
+
+    // ---- input mode (voice activity / push to talk) ----
+
+    [Theory]
+    [InlineData("""{"mode":{"type":"VOICE_ACTIVITY","shortcut":[]}}""", "VOICE_ACTIVITY", false)]
+    [InlineData("""{"mode":{"type":"PUSH_TO_TALK","shortcut":[{"type":0,"code":192,"name":"`"}]}}""", "PUSH_TO_TALK", true)]
+    [InlineData("""{"mode":{"type":"PUSH_TO_TALK"}}""", "PUSH_TO_TALK", false)]
+    [InlineData("""{"mode":{"type":"SOMETHING_NEW","shortcut":[]}}""", null, false)]
+    [InlineData("""{"mute":true}""", null, false)]
+    [InlineData("""{"mode":{"type":7}}""", null, false)]
+    public void The_input_mode_and_ptt_key_are_read_from_the_voice_settings(string json, string? mode, bool pttKey)
+    {
+        var (m, key) = DiscordMonitor.InputModeOf(JsonNode.Parse(json));
+        Assert.Equal(mode, m);
+        Assert.Equal(pttKey, key);
+    }
+
+    [Fact]
+    public void Switching_the_input_mode_shows_at_once_and_an_older_poll_does_not_undo_it()
+    {
+        var monitor = Monitor(true);
+        monitor.PublishPoll(monitor.VoiceRevision, false, false, Polled() with { InputMode = "VOICE_ACTIVITY", PttKey = true });
+        var rev = monitor.VoiceRevision;                                           // a poll reads voice activity here...
+        monitor.ApplyVoice(JsonNode.Parse("""{"mode":{"type":"PUSH_TO_TALK","shortcut":[{"type":0,"code":192}]}}"""));
+        Assert.Equal("PUSH_TO_TALK", monitor.Snapshot().InputMode);
+        monitor.PublishPoll(rev, false, false, Polled() with { InputMode = "VOICE_ACTIVITY", PttKey = true }); // ...and finishes late
+        Assert.Equal("PUSH_TO_TALK", monitor.Snapshot().InputMode);
+        Assert.True(monitor.Snapshot().PttKey);
+    }
+
+    [Fact]
+    public void A_mute_answer_without_a_mode_keeps_the_input_mode()
+    {
+        var monitor = Monitor(true);
+        monitor.PublishPoll(monitor.VoiceRevision, false, false, Polled() with { InputMode = "PUSH_TO_TALK", PttKey = false });
+        monitor.ApplyVoice(JsonNode.Parse("""{"mute":true}"""));
+        Assert.Equal("PUSH_TO_TALK", monitor.Snapshot().InputMode);
+        Assert.False(monitor.Snapshot().PttKey);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    public async Task Switching_the_input_mode_needs_control_like_the_other_buttons(bool? control)
+    {
+        var error = await Monitor(control).ActAsync("inputmode", null);
+        Assert.Contains("turned off", error);
+    }
+
+    [Fact]
+    public async Task Switching_the_input_mode_needs_a_connection()
+    {
+        Assert.Equal("Discord is not connected", await Monitor(true).ActAsync("inputmode", null));
     }
 
     // ---- reconnecting ----
@@ -481,11 +575,10 @@ public sealed class DiscordTests : IDisposable
         }
     }
 
-    // --config with a settings file named like the login file: saving a login must not replace the settings.
     [Fact]
     public void Authorize_asks_for_a_code_without_naming_a_redirect()
     {
-        // over IPC Discord refuses redirect_uri (#338, #343), and without response_type it asks for one (#316)
+        // over IPC Discord refuses redirect_uri (#338, #343); it uses the application's first registered redirect
         var args = DiscordMonitor.AuthorizeArgs("123");
         Assert.Equal("123", args["client_id"]!.GetValue<string>());
         Assert.Equal("code", args["response_type"]!.GetValue<string>());
@@ -493,6 +586,17 @@ public sealed class DiscordTests : IDisposable
         Assert.Contains("rpc", args["scopes"]!.AsArray().Select(s => s!.GetValue<string>()));
     }
 
+    // An application without a saved redirect gets "Missing redirect_uri" from AUTHORIZE (#316): say where to add it.
+    [Fact]
+    public void A_refusal_for_a_missing_redirect_says_where_to_add_it()
+    {
+        var missing = DiscordMonitor.Refusal("OAuth2 Error: invalid_request: Missing \"redirect_uri\" in request.");
+        Assert.Contains("Missing \"redirect_uri\"", missing);
+        Assert.Contains("http://127.0.0.1 under OAuth2 › Redirects", missing);
+        Assert.Equal("Discord login was refused (OAuth2 Error: access_denied).", DiscordMonitor.Refusal("OAuth2 Error: access_denied"));
+    }
+
+    // --config with a settings file named like the login file: saving a login must not replace the settings.
     [Fact]
     public void The_login_file_never_is_the_settings_file()
     {

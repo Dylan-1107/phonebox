@@ -192,6 +192,7 @@ body.night #pagePauseOverlay { display: none; }
 body.offline #offline { display: flex; align-items: center; gap: 5px; }
 /* Wake-on-LAN: under the offline pill, only while the PC is unreachable (main.js shows it when the app can wake it) */
 #wake { position: fixed; top: 38px; right: var(--pad-r); z-index: 6; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: 280px; }
+body.night #wake { z-index: 31; }
 #wake[hidden] { display: none; }
 #wake button { min-height: 44px; padding: 0 18px; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .1); color: var(--text); font-size: 14px; font-weight: 600; }
 #wake button:disabled { opacity: .6; }
@@ -818,6 +819,8 @@ html.beat-4 .obs-pill.on .obs-led { box-shadow: 0 0 34px rgba(239, 68, 68, .9); 
 .dc-btn:disabled { opacity: .7; }
 .dc-btn:active { transform: scale(.95); }
 .dc-btn.busy, .dc-chan.busy { opacity: .55; }
+.dc-btn.mode.on { background: rgba(245, 158, 11, .2); border-color: rgba(245, 158, 11, .5); }
+.dc-warn { font-size: 12px; color: #fbbf24; padding: 4px 8px; border-left: 3px solid #f59e0b; background: rgba(245, 158, 11, .08); border-radius: 6px; }
 .dc-members { display: flex; flex-wrap: wrap; gap: 5px; }
 .dc-member { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: rgba(88, 101, 242, .22); }
 .dc-member.muted, .dc-member.deaf { background: rgba(255, 255, 255, .07); color: var(--muted); }
@@ -849,6 +852,26 @@ html.beat-4 .obs-pill.on .obs-led { box-shadow: 0 0 34px rgba(239, 68, 68, .9); 
 .dc-chans { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
 .dc-chan { display: flex; flex-direction: column; align-items: flex-start; border: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .05); color: var(--text); border-radius: 10px; font: inherit; font-size: 13px; padding: 5px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dc-chan.cur { background: rgba(88, 101, 242, .28); border-color: rgba(88, 101, 242, .6); font-weight: 600; }
+/* favourites: the ★ bar above the servers, stars beside a server or channel while choosing */
+.dc-favbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.dc-favhint { flex: 1; font-size: 11px; color: var(--muted); }
+.dc-favbtn { border: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .05); color: var(--text); border-radius: 999px; font: inherit; font-size: 12px; padding: 3px 10px; }
+.dc-favbtn.on { background: rgba(35, 165, 90, .25); border-color: rgba(35, 165, 90, .6); }
+.dc-headrow { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.dc-gone { flex: none; display: flex; flex-direction: column; gap: 4px; }
+.dc-goneid { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+.dc-goneid small { color: var(--muted); }
+.dc-headrow > .dc-server, .dc-headrow > .dc-chan { flex: 1; min-width: 0; }
+.dc-star { flex: none; border: none; background: none; color: var(--muted); font-size: 20px; line-height: 1; padding: 2px 4px; }
+.dc-star.on { color: #f0b232; }
+.dc-block.editing:not(.open) { flex-basis: 120px; }
+/* who is in a favourite server's voice channel */
+.dc-room { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.dc-room > .dc-chan { width: 100%; }
+.dc-people { display: flex; flex-wrap: wrap; gap: 3px 8px; padding: 0 4px; }
+.dc-person { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-person .dc-ico { width: 16px; height: 16px; font-size: 9px; }
+.dc-invoice { color: #3ba55d; }
 .dc-notes { display: flex; flex-direction: column; gap: 4px; overflow: hidden; min-height: 0; }
 .dc-note { display: flex; flex-direction: column; font-size: 12px; padding: 4px 8px; border-left: 3px solid #5865f2; background: rgba(255, 255, 255, .04); border-radius: 6px; }
 .dc-note span { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1356,3 +1379,53 @@ body.controls-top .ap-foot { order: -1; margin-bottom: 4px; }
 
 /* text for screen readers only (an icon-only element keeps its meaning) */
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Steam library (widgets/steam-library.js): covers of the installed games, most recently played first */
+.w-steam-library { padding: 9px 12px; display: flex; flex-direction: column; gap: 6px; }
+.w-steam-library .w-title { color: #79a9e8; }
+.sl-count { color: var(--dim); font-weight: 400; letter-spacing: 0; }
+.sl-grid { flex: 1; min-height: 0; overflow-y: auto; display: grid; gap: 8px; align-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(62px, 22cqh, 104px), 1fr)); scrollbar-width: none; }
+.sl-grid::-webkit-scrollbar { display: none; }
+.sl-tile { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 0; text-align: left; border-radius: 9px; transition: transform .12s; }
+.sl-can-launch .sl-tile:active { transform: scale(.96); }
+.sl-tile.busy { opacity: .55; }
+.sl-cover { position: relative; width: 100%; aspect-ratio: 2 / 3; border-radius: 8px; overflow: hidden; display: grid; place-items: center;
+  background: linear-gradient(160deg, #1e3a5f, #0f172a); border: 1px solid var(--line); }
+.sl-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .3s; }
+.sl-cover.has-art img { opacity: 1; }
+.sl-initials { font-size: clamp(14px, 9cqh, 26px); font-weight: 800; color: rgba(255, 255, 255, .5); letter-spacing: .04em; }
+.sl-name { font-size: 11px; line-height: 1.2; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sl-status { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sl-tile.running .sl-cover { border-color: #22c55e; box-shadow: 0 0 0 2px rgba(34, 197, 94, .35); }
+.sl-tile.running .sl-status { color: #4ade80; font-weight: 600; }
+.sl-tile.armed .sl-cover { border-color: rgba(167, 139, 250, .8); box-shadow: 0 0 0 2px rgba(167, 139, 250, .35); }
+.sl-tile.armed .sl-status { color: #ddd6fe; font-weight: 600; }
+/* a favorite: a small gold corner on the cover */
+.sl-tile.fav .sl-cover::after { content: ''; position: absolute; top: 0; right: 0; z-index: 1; border-style: solid; border-width: 0 14px 14px 0;
+  border-color: transparent #fbbf24 transparent transparent; }
+.sl-tile.sl-updating .sl-status, .sl-tile.sl-paused .sl-status, .sl-tile.sl-update .sl-status { color: #fbbf24; }
+.sl-progress { position: absolute; left: 0; top: 0; height: 3px; background: #60a5fa; border-radius: 3px; transition: width .6s; }
+/* a short library (two rows of the grid): covers sized to the height, the name only on the cover's own art */
+@container (max-height: 175px) {
+  .sl-grid { grid-template-columns: repeat(auto-fill, clamp(36px, calc((100cqh - 42px) * .66), 110px)); justify-content: start; }
+  .sl-name, .sl-status { display: none; }
+  .sl-tile.armed .sl-status { display: block; position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font-size: 9px;
+    white-space: normal; background: rgba(0, 0, 0, .7); padding: 2px; }
+}
+/* Lyrics (widgets/lyrics.js): timed lines follow the song, the current one lit in the middle */
+.w-lyrics { padding: 9px 12px 6px; display: flex; flex-direction: column; gap: 6px; }
+.w-lyrics .w-title { color: rgb(var(--ambient)); }
+.ly-list { position: relative; flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; scroll-behavior: smooth;
+  -webkit-mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent); mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent); }
+.ly-list::-webkit-scrollbar { display: none; }
+.w-lyrics.timed .ly-list { padding: 40cqh 0; }
+.ly-line { font-size: clamp(13px, 9cqh, 26px); font-weight: 700; line-height: 1.35; padding: 3px 0; color: rgba(255, 255, 255, .32); transition: color .35s, transform .35s; transform-origin: left center; }
+.ly-line.past { color: rgba(255, 255, 255, .2); }
+.ly-line.now { color: var(--text); transform: scale(1.04); }
+.ly-line.gap { color: rgba(255, 255, 255, .18); }
+.w-lyrics.plain .ly-line { color: var(--text); font-weight: 500; font-size: clamp(12px, 6.5cqh, 18px); }
+.ly-note { font-size: 12px; color: var(--muted); text-align: center; }
+.ly-note[hidden] { display: none; }
+.w-lyrics:not(.timed):not(.plain) .ly-note { margin: auto; }
+.ly-credit { position: absolute; right: 10px; top: 9px; font-size: 9px; letter-spacing: .1em; color: var(--dim); }

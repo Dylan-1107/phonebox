@@ -16,6 +16,8 @@ import './widgets/console.js';
 import './widgets/dictate.js';
 import './widgets/camera.js';
 import './widgets/spectrum.js';
+import './widgets/steam-library.js';
+import './widgets/lyrics.js';
 
 // PhoneBox desk panel. Pages are 12 × 6 grids of widgets, designed in the agent's settings page.
 // The panel talks to the PhoneBox agent through "/agent/*", which the Android shell proxies over USB
@@ -74,7 +76,7 @@ export const FALLBACK_PAGES = [{
 export const DEFAULT_CFG = {
   weather: { city: 'Tallinn', lat: 59.437, lon: 24.745, unit: 'celsius', model: '' },
   night: { enabled: true, start: '00:30', end: '07:30', brightness: 0.02 },
-  display: { showSeconds: true, idleReturnSec: 90, vibrate: true, finishToast: true, volumeKeys: true },
+  display: { showSeconds: true, idleReturnSec: 90, vibrate: true, finishToast: true, volumeKeys: true, nightWhenUnreachable: false, unreachableNightDelayMin: 5 },
   opencode: { alwaysCountdownSec: 10 },
   pages: FALLBACK_PAGES,
   shortcuts: [],
@@ -1398,10 +1400,10 @@ export function handleEvent(e) {
   else if (e.kind === 'reload') location.reload();
 }
 
-export const WIDGET_ICONS = { camera: '📹', dictate: '🎙️', spectrum: '📶', 'app-console': '🎛️', discord: '💬', steam: '👥', 'steam-activity': '🔔', rules: '⚡', chargecare: '🔋', nextup: '⏭️', moon: '🌙', wordclock: '🔤', clock: '🕒', weather: '⛅', forecast: '🌦️', media: '🎵', stat: '📈', gauge: '⏲️', chart: '📊', meters: '💾', gpu: '🎮', quotas: '✳️', sessions: '🤖',
+export const WIDGET_ICONS = { camera: '📹', dictate: '🎙️', spectrum: '📶', 'app-console': '🎛️', discord: '💬', steam: '👥', 'steam-activity': '🔔', rules: '⚡', chargecare: '🔋', nextup: '⏭️', moon: '🌙', wordclock: '🔤', clock: '🕒', weather: '⛅', forecast: '🌦️', media: '🎵', lyrics: '🎤', stat: '📈', gauge: '⏲️', chart: '📊', meters: '💾', gpu: '🎮', quotas: '✳️', sessions: '🤖',
   github: '🐙', processes: '⚙️', shortcuts: '🎛️', button: '🔘', worldclock: '🌍', calendar: '📅', pomodoro: '🍅', countdown: '⏳', note: '📝', command: '💻',
   push: '📡', inbox: '📬', label: '🔤', analog: '🕰️', progress: '📆', stopwatch: '⏱️', timer: '⏲️', counter: '🔢', breathe: '🫁', quote: '💬',
-  checklist: '✅', battery: '🔋', topprocs: '🔥', quotaring: '🎯', volume: '🔊', sun: '🌅', air: '🍃', hackernews: '📰', feeds: '🗞️', photos: '🖼️', exchange: '💱', crypto: '🪙', image: '🖼️', pcswitch: '🖥️' };
+  checklist: '✅', battery: '🔋', topprocs: '🔥', quotaring: '🎯', volume: '🔊', sun: '🌅', air: '🍃', hackernews: '📰', feeds: '🗞️', photos: '🖼️', exchange: '💱', crypto: '🪙', image: '🖼️', pcswitch: '🖥️', 'plex-queue': '🎛️' };
 
 // ================================================================= pages
 export const pager = $('pager');
@@ -2085,6 +2087,18 @@ export function setNight(on) {
   document.body.classList.toggle('night', on);
   applyBrightness(true);
 }
+let unreachableSince = 0;
+
+function reconcileUnreachableNight(now = new Date()) {
+  const enabled = !PREVIEW && cfg.display?.nightWhenUnreachable === true;
+  if (!enabled) unreachableSince = 0;
+  else if (online === false && unreachableSince === 0) unreachableSince = Date.now();
+  const delayMin = Math.max(1, Math.min(30, +cfg.display?.unreachableNightDelayMin || 5));
+  const unreachable = enabled && unreachableSince > 0
+    && Date.now() - unreachableSince >= delayMin * 60_000;
+  const dark = darkRoom && cfg.display?.nightWhenDark === true;
+  setNight((isNight(now) || dark || unreachable) && Date.now() > wakeUntil);
+}
 /**
  * Before widgets are built: a timer that ran out while the panel was closed rings during the build, so the night
  * screen must already be on if the schedule says so (nightOn is null at start, and new settings may move the night).
@@ -2194,8 +2208,7 @@ export function tick() {
   $('nClock').textContent = fmtHM(now);
   $('nDate').textContent = now.toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' });
   if (darkSince && Date.now() - darkSince > 30_000) darkRoom = true;
-  const dark = darkRoom && cfg.display?.nightWhenDark === true;
-  setNight((isNight(now) || dark) && Date.now() > wakeUntil);
+  reconcileUnreachableNight(now);
   if (!PREVIEW && idleDue() && !navQueue.some((r) => r.kind === 'home')) {
     if (curPage === homeIndex()) { closeSheet(); closeOverview(); lastNav = Date.now(); } // only a sheet to close
     else { navQueue.push({ kind: 'home', at: Date.now(), priority: -1 }); pump(); }
@@ -2362,7 +2375,10 @@ export function setOnline(on) {
   wakeRender();
   if (on && online !== true) { loadConfig(); loadQuotas(); loadWork(); loadPush(); loadApprovals(); loadCalendar(); }
   const changed = online !== on;
+  if (!on && changed) unreachableSince = unreachableSince || Date.now();
+  if (on && changed) unreachableSince = 0;
   online = on;
+  reconcileUnreachableNight();
   if (changed) emit('state');
 }
 
