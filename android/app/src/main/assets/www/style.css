@@ -910,6 +910,30 @@ html.beat-4 .obs-pill.on .obs-led { box-shadow: 0 0 34px rgba(239, 68, 68, .9); 
 .dc-hint { flex: none; font-size: 11px; color: var(--muted); }
 .dc-apps { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .dc-app { flex: none; border: none; background: rgba(255, 255, 255, .06); color: var(--text); border-radius: 9px; font: inherit; font-size: 13px; padding: 8px 10px; text-align: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* chat (read-only): 💬 in the top row, then a channel picker and the messages */
+.dc-btn.chat { position: relative; }
+.dc-btn.chat.on { background: rgba(88, 101, 242, .28); border-color: rgba(88, 101, 242, .6); }
+.dc-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #f23f43; flex: none; }
+.dc-btn.chat .dc-dot { position: absolute; top: 2px; right: 2px; }
+.dc-chatbar { display: flex; gap: 6px; align-items: center; flex: none; }
+.dc-pick { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; border: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .05); color: var(--text); border-radius: 10px; font: inherit; font-size: 13px; font-weight: 600; padding: 5px 9px; text-align: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-pick small { color: var(--muted); font-weight: 400; font-size: 11px; }
+.dc-open { flex: none; border: 1px solid rgba(88, 101, 242, .6); background: rgba(88, 101, 242, .3); color: var(--text); border-radius: 10px; font-size: 16px; padding: 4px 10px; }
+.dc-picklist { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.dc-pickrow { flex: none; display: flex; align-items: center; gap: 8px; border: none; background: rgba(255, 255, 255, .05); color: var(--text); border-radius: 9px; font: inherit; font-size: 13px; padding: 7px 9px; text-align: start; min-width: 0; }
+.dc-pickrow.cur { background: rgba(35, 165, 90, .3); font-weight: 600; }
+.dc-pickrow.back { background: none; color: var(--muted); font-weight: 600; }
+.dc-pickrow .dc-pname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-pickrow small { color: var(--muted); }
+.dc-msgs { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.dc-msg { flex: none; display: flex; gap: 7px; padding: 3px 2px; }
+.dc-msg.cont { padding-top: 0; }
+.dc-msg .dc-ico, .dc-msgav { width: 26px; height: 26px; font-size: 11px; flex: none; }
+.dc-msgb { min-width: 0; flex: 1; }
+.dc-who { font-size: 12px; font-weight: 700; }
+.dc-who small { color: var(--muted); font-weight: 400; font-size: 10px; margin-inline-start: 6px; }
+.dc-msgtext { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dc-extra { font-size: 11px; color: var(--muted); }
 .dc-members { display: flex; flex-wrap: wrap; gap: 5px; }
 .dc-member { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: rgba(88, 101, 242, .22); }
 .dc-member.muted, .dc-member.deaf { background: rgba(255, 255, 255, .07); color: var(--muted); }

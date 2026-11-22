@@ -429,6 +429,136 @@ test('an action that is never answered frees the buttons again', async ({ page }
   expect((await page.evaluate(() => window.__share)).filter((u) => u.startsWith('/share/pick'))).toHaveLength(1); // not sent again by itself
 });
 
+// the chat (discord.chat in the settings); answers: url part -> a function of the demo's answer, for what the demo doesn't do
+async function showChat(page, { chat = true, options = { control: true }, answers = null, allowControl = false } = {}) {
+  if (answers) {
+    await page.addInitScript((answers) => {
+      window.__chat = [];
+      const wrap = () => {
+        const f = window.fetch;
+        if (!f || f.__chat) return;
+        const g = async (input, init) => {
+          const url = typeof input === 'string' ? input : input.url;
+          if (url.includes('/discord/chat')) window.__chat.push(url.replace(/^.*\/discord/, ''));
+          const r = await f(input, init);
+          const patch = answers.find((x) => new RegExp(x.url).test(url));
+          if (!patch) return r;
+          const text = JSON.stringify({ ...(await r.json()), ...patch.json });
+          if (patch.hold) {
+            await new Promise((done) => { window.__release = done; });
+            setTimeout(() => { window.__released = true; }, 50); // after the widget has handled it
+          }
+          return new Response(text, { headers: { 'Content-Type': 'application/json' } });
+        };
+        g.__chat = true;
+        window.fetch = g;
+      };
+      setInterval(wrap, 10);
+    }, answers);
+  }
+  await page.goto('/panel/');
+  await page.evaluate(([chat, options, allowControl]) => {
+    localStorage.clear();
+    localStorage.setItem('pb-demo-config', JSON.stringify({ night: { enabled: false }, rules: [], shortcuts: [], discord: { chat, allowControl },
+      pages: [{ id: 'dc', title: 'Discord', enabled: true, widgets: [{ id: 'd', type: 'discord', x: 0, y: 0, w: 6, h: 5, options }] }] }));
+  }, [chat, options, allowControl]);
+  await page.reload();
+  await expect(page.locator('.w-discord .dc-top')).toBeVisible();
+}
+
+test('without the chat setting there is no chat', async ({ page }) => {
+  await showChat(page, { chat: false });
+  await expect(page.locator('.dc-btn.chat')).toHaveCount(0);
+});
+
+test('the chat shows the voice channel, then a text channel that is picked', async ({ page }) => {
+  const errors = []; page.on('pageerror', (e) => errors.push(String(e)));
+  await showChat(page);
+  const chat = page.locator('.dc-btn.chat');
+  await expect(chat.locator('.dc-dot')).toBeVisible();                    // a message not seen yet
+  await chat.click();
+  await expect(page.locator('.dc-msg')).toHaveText([/Ada.*hi from the call/]);
+  await expect(page.locator('.dc-members')).toHaveCount(0);               // the chat takes the widget's place
+  await page.locator('.dc-pick').click();
+  await page.locator('.dc-pickrow.srv', { hasText: 'Friends' }).click();
+  await page.locator('.dc-pickrow', { hasText: 'general' }).click();
+  await expect(page.locator('.dc-pick')).toContainText('general');
+  await expect(page.locator('.dc-msg')).toHaveText([/Ada.*are you joining/, /Linus.*in 5 min/]);
+  await chat.click();                                                     // back to the channels
+  await expect(page.locator('.dc-members')).toBeVisible();
+  await expect(chat.locator('.dc-dot')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('an open channel picker asks for no messages, and goes back to them when it closes', async ({ page }) => {
+  await showChat(page, { answers: [] });
+  await page.locator('.dc-btn.chat').click();
+  await expect(page.locator('.dc-msg')).toHaveCount(1);
+  await page.locator('.dc-pick').click();
+  await expect(page.locator('.dc-pickrow.srv')).toBeVisible();
+  await page.evaluate(() => { window.__chat.length = 0; });
+  await expect.poll(() => page.evaluate(() => window.__chat.length), { timeout: 6000 }).toBeGreaterThan(0);
+  expect((await page.evaluate(() => window.__chat)).every((u) => u.startsWith('/chat?picker=true'))).toBe(true);
+  await page.locator('.dc-pick').click();
+  await expect(page.locator('.dc-msg')).toHaveCount(1);
+});
+
+test('an answer for a server already left does not replace the newer one', async ({ page }) => {
+  const other = { servers: [{ id: 'g1', name: 'Friends', icon: null, unread: false }, { id: 'g2', name: 'Work', icon: null, unread: false }] };
+  await showChat(page, { answers: [
+    { url: 'guild=g1', hold: true, json: { ...other, channels: [{ id: 't1', name: 'general', unread: false }] } },
+    { url: 'guild=g2', json: { ...other, channels: [{ id: 't9', name: 'deploys', unread: false }] } },
+    { url: 'discord/chat$|picker=true$', json: other }] });
+  await page.locator('.dc-btn.chat').click();
+  await page.locator('.dc-pick').click();
+  await page.locator('.dc-pickrow.srv', { hasText: 'Friends' }).click();   // its answer is held back
+  await expect.poll(() => page.evaluate(() => typeof window.__release)).toBe('function');
+  await page.locator('.dc-pickrow.back').click();
+  await page.locator('.dc-pickrow.srv', { hasText: 'Work' }).click();
+  await expect(page.locator('.dc-pickrow', { hasText: 'deploys' })).toBeVisible();
+  await page.evaluate(() => {                                              // now the older one arrives; the next poll would hide it again
+    const shown = () => [...document.querySelectorAll('.dc-pickrow')].some((r) => r.textContent.includes('general'));
+    window.__stale = false;
+    new MutationObserver(() => { window.__stale ||= shown(); }).observe(document.body, { childList: true, subtree: true });
+    window.__release();
+  });
+  await page.waitForFunction(() => window.__released);
+  expect(await page.evaluate(() => window.__stale)).toBe(false);
+  await expect(page.locator('.dc-pickrow', { hasText: 'deploys' })).toBeVisible();
+  await expect(page.locator('.dc-pickrow', { hasText: 'general' })).toHaveCount(0);
+});
+
+test('a declined permission says so in the chat, and the buttons keep working', async ({ page }) => {
+  await showChat(page, { answers: [{ url: 'discord/chat', json: { ready: false, error: null } }] });
+  await page.locator('.dc-btn.chat').click();
+  await expect(page.locator('.w-discord .empty')).toHaveText('Approve PhoneBox in Discord to see the chat');
+  await page.locator('.dc-btn.mute').click();
+  await expect(page.locator('.dc-btn.mute')).toHaveClass(/\bon\b/);
+});
+
+test('opening the chat in Discord needs the widget\'s control, not only the global switch', async ({ page }) => {
+  await showChat(page);
+  await page.locator('.dc-btn.chat').click();
+  await expect(page.locator('.dc-open')).toBeVisible();
+  await showChat(page, { options: {}, allowControl: true });
+  await expect(page.locator('.dc-btn.mute')).toBeEnabled();               // the global switch allows the voice actions
+  await page.locator('.dc-btn.chat').click();
+  await expect(page.locator('.dc-msg')).toHaveCount(1);
+  await expect(page.locator('.dc-open')).toHaveCount(0);
+});
+
+test('message text is shown as text, in full, and opening it in Discord needs control', async ({ page }) => {
+  const long = '<b>bold</b> ' + 'line\n'.repeat(30);
+  const message = { id: '1', author: 'Ada', authorId: '1', avatar: null, color: null, bot: false, text: long, ts: Date.now(), attachments: 2, embed: null };
+  await showChat(page, { options: {}, answers: [{ url: 'discord/chat$', json: { messages: [message] } }] });
+  await page.locator('.dc-btn.chat').click();
+  const text = page.locator('.dc-msgtext');
+  await expect(text).toContainText('<b>bold</b>');
+  expect(await text.evaluate((e) => e.scrollHeight <= e.clientHeight + 1)).toBe(true); // no scroll area of its own
+  await expect(page.locator('.dc-extra')).toHaveText('📎 2');
+  await expect(page.locator('.dc-open')).toHaveCount(0);
+});
+
 test('the ring moves without redrawing the widget, so avatars and server icons do not flash', async ({ page }) => {
   await show(page);
   const ada = page.locator('.dc-member', { hasText: 'Ada' });

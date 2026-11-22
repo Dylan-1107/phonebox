@@ -697,12 +697,24 @@ app.MapGet("/api/discord", (DiscordMonitor dc, ConfigStore cfg) => Results.Json(
     snapshot = dc.Snapshot(),
     control = DiscordMonitor.ControlAllowed(cfg.Get()),
     share = DiscordMonitor.ShareWanted(cfg.Get()),
+    widgetControl = DiscordMonitor.WidgetControl(cfg.Get()),
+    chat = DiscordMonitor.ChatWanted(cfg.Get()),
+    chatUnread = dc.ChatUnread(),
 }));
 // Screen share (its own switch, off by default): the state, and the running apps (names only) while
 // the phone's share view is open. It needs a widget's control (the global switch is not enough). code: what went wrong, for the panel to say in its language.
 app.MapGet("/api/discord/share", (bool? apps, DiscordMonitor dc) => Results.Json(dc.Share(apps == true)));
 app.MapPost("/api/discord/share/{action}", async (string action, int? pid, DiscordMonitor dc) =>
     await dc.ShareActAsync(action, pid) is { } e ? Results.BadRequest(new { error = e.Error, code = e.Code }) : Results.Ok(new { ok = true }));
+// Chat (read-only, Settings › General › Discord › chat, off by default): the chosen channel's last messages, the servers
+// or, for the phone's channel picker (?picker=true), no messages but the text channels of ?guild=. Only while the setting
+// is on and a Discord widget is on an enabled page; message text comes from memory only.
+app.MapGet("/api/discord/chat", async (string? guild, bool? picker, DiscordMonitor dc, CancellationToken ct) =>
+    Results.Json(await dc.ChatAsync(guild, picker == true, ct)));
+app.MapPost("/api/discord/chat/choose", (string? channel, DiscordMonitor dc) =>
+    dc.ChatChoose(channel) is { } error ? Results.BadRequest(new { error }) : Results.Ok(new { ok = true }));
+app.MapPost("/api/discord/chat/open", async (DiscordMonitor dc) =>
+    await dc.ChatOpenAsync() is { } error ? Results.BadRequest(new { error }) : Results.Ok(new { ok = true }));
 // Ids go in the query string: the Android app lets image requests through by exact path (READ_ONLY_IMAGES).
 app.MapGet("/api/discord/img", async (string kind, string id, string hash, DiscordMonitor dc, CancellationToken ct) =>
     await dc.ImageAsync(kind, id, hash, ct) is { } img
