@@ -11,8 +11,10 @@
   [M00n-of-saturn](https://github.com/M00n-of-saturn)).
 - Display brightness: the slider keeps the level it was set to. It used to jump back to the old level for up to
   30 s, until the agent read the monitor again (#360, [andrii-pavlykivskyi](https://github.com/andrii-pavlykivskyi)).
-- News feeds: a long article link opens in the browser again on Windows, not in File Explorer. Links now go to the
-  default browser through Windows' URL handler instead of explorer.exe (#386, [Exrahn](https://github.com/Exrahn)).
+- News feeds: tapping a headline opens the article in the browser again on Windows, not an empty File Explorer
+  window. explorer.exe mistook some links (long ones, or ones with a query string) for something else; links now go
+  to the default browser through Windows' URL handler (#386, #411, [Exrahn](https://github.com/Exrahn),
+  [dedesoso3366](https://github.com/dedesoso3366)).
 
 **Panel**
 - The Spectrum bars and App console widgets stop asking the PC while nobody can see the panel (screen off, another
