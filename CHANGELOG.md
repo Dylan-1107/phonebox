@@ -11,6 +11,8 @@
   [M00n-of-saturn](https://github.com/M00n-of-saturn)).
 - Display brightness: the slider keeps the level it was set to. It used to jump back to the old level for up to
   30 s, until the agent read the monitor again (#360, [andrii-pavlykivskyi](https://github.com/andrii-pavlykivskyi)).
+- News feeds: a long article link opens in the browser again on Windows, not in File Explorer. Links now go to the
+  default browser through Windows' URL handler instead of explorer.exe (#386, [Exrahn](https://github.com/Exrahn)).
 
 **Panel**
 - The Spectrum bars and App console widgets stop asking the PC while nobody can see the panel (screen off, another
