@@ -809,6 +809,8 @@ class MainActivity : Activity(), SensorEventListener {
                 when (action) {
                     "show" -> showPageWeb(pageKey, url.trim(), x.toFloat(), y.toFloat(), w.toFloat(), h.toFloat())
                     "hide" -> hidePageWeb()
+                    // a site that got stuck (a permission prompt it answered wrongly, a failed load) can be reloaded
+                    "reload" -> siteViews[pageKey + "|" + url.trim()]?.reload()
                 }
             }
         }

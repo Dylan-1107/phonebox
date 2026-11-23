@@ -1505,6 +1505,12 @@ export function buildLayout() {
       sites.forEach((site, i) => {
         const tab = h('button', 'bx-tab' + (i === sel ? ' on' : ''), site.name);
         tab.title = site.url;
+        // long press: reload that site (a page can get stuck after a question it answered wrongly)
+        tab.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          haptic();
+          try { bridge && bridge.webPage('reload', site.url, p.id || p.title, 0, 0, 0, 0); } catch (_) {}
+        });
         tab.addEventListener('click', () => {
           const slot = webSlots.get(p.id || p.title);
           // compare with what is showing now, not with the page as it was built: otherwise the tab you came

@@ -8,6 +8,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Dictation widget only: asked for the first time its microphone button is tapped -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- A site's microphone capture: Chromium's WebRTC audio layer switches the audio mode to communication,
+         which Android only allows with this permission (Chrome declares it too). -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- All apps (this phone) widget only: the launcher list of the tablet's own apps. From Android 11 a package is
          otherwise invisible to the app; the list stays on the phone and nothing is sent anywhere. -->
     <uses-permission
