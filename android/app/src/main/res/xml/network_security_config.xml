@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Cleartext HTTP is allowed only for the local agent reached over USB (adb reverse). -->
+<!-- Cleartext HTTP for the local agent reached over USB (adb reverse) and for the sites a person adds to a browser
+     page: home services are usually plain http on a LAN address (192.168.x.x:port), and Android blocks that by
+     default from targetSdk 28 on. Only addresses the owner types are opened; nothing else in the app speaks http. -->
 <network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">127.0.0.1</domain>
         <domain includeSubdomains="false">localhost</domain>
