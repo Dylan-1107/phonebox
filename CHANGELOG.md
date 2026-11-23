@@ -23,6 +23,11 @@
   and player address, with **Check Plex connection**). Off until a server and a token are entered; the token goes
   only to your Plex server. The widget's requests are made only while an enabled page shows it; **Check Plex
   connection** sends one check each time you press it (#379, #409, [snachodog](https://github.com/snachodog)).
+- Plex playlists: a widget starts a Plex playlist on the Plex player with one tap. In the layout editor its options
+  list the playlists on your Plex server to tick, so no playlist id has to be typed; with none ticked it shows every
+  Plex playlist control. A playlist starts only from a Plex playlists widget on an enabled page that shows it. The
+  Plex queue widget is now at least 4 × 4 and the playlists widget 3 × 3, so their text isn't cut off (#379, #414,
+  [snachodog](https://github.com/snachodog)).
 - Discord: start and stop a screen share from the phone. The widget's share view lists the apps with a window on the
   computer (names only, on Windows; elsewhere use the picker), or opens Discord's own picker there, and stops the
   share. It has its own setting in **Settings › General › Discord** (**Start and stop Discord screen shares from the
