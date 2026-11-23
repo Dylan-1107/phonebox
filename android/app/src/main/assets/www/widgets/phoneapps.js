@@ -1,4 +1,4 @@
-import { h, bridge, haptic, toast, tp, LOCALE } from '../main.js';
+import { h, bridge, haptic, toast, t, LOCALE } from '../main.js';
 import { W } from '../registry.js';
 import { every } from './helpers.js';
 
@@ -15,10 +15,10 @@ W.phoneapps = {
     const sortLocale = LOCALE || undefined;
     let apps = null, q = '', busy = null, armed = null, armTimer = 0, lastKey = '';
 
-    const head = h('div', 'w-title', o.title || tp('Apps'), h('span', 'ap-count'));
+    const head = h('div', 'w-title', o.title || t('phoneapps.title'), h('span', 'ap-count'));
     const search = h('input', 'ap-search');
     search.type = 'search';
-    search.placeholder = tp('Search apps');
+    search.placeholder = t('phoneapps.search');
     search.autocomplete = 'off';
     search.spellcheck = false;
     search.addEventListener('input', () => { q = search.value.trim().toLowerCase(); render(true); });
@@ -46,7 +46,7 @@ W.phoneapps = {
       render(true);
       let ok = false;
       try { ok = bridge.launchApp(a.id) === true; } catch (_) { ok = false; }
-      if (!ok) toast(tp('Could not open {name}').replace('{name}', a.name), 'err');
+      if (!ok) toast(t('phoneapps.failed', { name: a.name }), 'err');
       busy = null;
       render(true);
     };
@@ -63,7 +63,7 @@ W.phoneapps = {
       }, { once: true });
       const isArmed = armed === a.id;
       const b = h('button', 'ap-tile' + (busy === a.id ? ' busy' : '') + (isArmed ? ' armed' : ''),
-        img, h('span', 'ap-name', isArmed ? tp('Tap again to open') : a.name));
+        img, h('span', 'ap-name', isArmed ? t('phoneapps.confirm') : a.name));
       b.title = a.name;
       b.addEventListener('click', () => {
         if (!confirm || armed === a.id) { clearTimeout(armTimer); armed = null; open(a); return; }
@@ -81,7 +81,7 @@ W.phoneapps = {
         if (lastKey !== 'no-bridge' || force) {
           lastKey = 'no-bridge';
           head.querySelector('.ap-count').textContent = '';
-          grid.replaceChildren(h('div', 'empty', tp('Open this page on the phone to see its apps')));
+          grid.replaceChildren(h('div', 'empty', t('phoneapps.needsApp')));
         }
         return;
       }
@@ -93,8 +93,8 @@ W.phoneapps = {
       if (!force && key === lastKey) return;
       lastKey = key;
       head.querySelector('.ap-count').textContent = all.length ? ` ${q ? items.length + '/' : ''}${all.length}` : '';
-      if (!all.length) { grid.replaceChildren(h('div', 'empty', tp('No apps found'))); return; }
-      if (!items.length) { grid.replaceChildren(h('div', 'empty', `${tp('No apps match')} "${search.value.trim()}"`)); return; }
+      if (!all.length) { grid.replaceChildren(h('div', 'empty', t('phoneapps.noApps'))); return; }
+      if (!items.length) { grid.replaceChildren(h('div', 'empty', `${t('phoneapps.noMatch')} "${search.value.trim()}"`)); return; }
       grid.replaceChildren(...items.map(tile));
     };
 

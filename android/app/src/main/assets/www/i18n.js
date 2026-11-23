@@ -34,6 +34,13 @@
 
   const STRINGS = {
     en: {
+      'phoneapps.title': 'Apps',
+      'phoneapps.search': 'Search apps',
+      'phoneapps.noApps': 'No apps found',
+      'phoneapps.noMatch': 'No apps match',
+      'phoneapps.confirm': 'Tap again to open',
+      'phoneapps.failed': 'Could not open {name}',
+      'phoneapps.needsApp': 'Open this page on the phone to see its apps',
       // Language selector
       'lang.auto': 'Follow system',
       'lang.label': 'Language',
@@ -8502,6 +8509,13 @@
       's.wh.payloadHintFull': 'Payload JSON có thể mang <code>value</code>, <code>title</code>, <code>sub</code>, <code>unit</code>, <code>icon</code>, <code>color</code>, <code>level</code> (ok / warn / error), <code>progress</code> (0&ndash;1 hoặc 0&ndash;100), <code>items</code> (một danh sách) và <code>ttl</code> (giây). Văn bản thuần hoặc một con số cũng dùng được. Thông báo nhận <code>title</code>, <code>text</code>, <code>level</code>, <code>vibrate</code>, <code>seconds</code>, <code>wake</code> (làm sáng màn hình ban đêm) và <code>page</code> (chuyển sang trang đó).',
     },
     zh: {
+      'phoneapps.title': '应用',
+      'phoneapps.search': '搜索应用',
+      'phoneapps.noApps': '没有找到应用',
+      'phoneapps.noMatch': '没有匹配的应用',
+      'phoneapps.confirm': '再点一次打开',
+      'phoneapps.failed': '无法打开 {name}',
+      'phoneapps.needsApp': '在平板上打开这一页才能看到应用',
       'lang.auto': '跟随系统',
       'lang.label': '语言',
 
