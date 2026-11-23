@@ -375,10 +375,10 @@ class MainActivity : Activity(), SensorEventListener {
         chrome.addView(pill(getString(R.string.web_back_to_panel)) { closePageWeb() },
             FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34f), Gravity.TOP or Gravity.START)
                 .apply { setMargins(dp(10f), dp(10f), 0, 0) })
-        chrome.addView(pill("‹") { siteJs("window.pbPrevPage && window.pbPrevPage()") },
+        chrome.addView(pill("‹") { panelJs("window.pbPrevPage && window.pbPrevPage()") },
             FrameLayout.LayoutParams(dp(44f), dp(44f), Gravity.BOTTOM or Gravity.START)
                 .apply { setMargins(dp(14f), 0, 0, dp(14f)) })
-        chrome.addView(pill("›") { siteJs("window.pbNextPage && window.pbNextPage()") },
+        chrome.addView(pill("›") { panelJs("window.pbNextPage && window.pbNextPage()") },
             FrameLayout.LayoutParams(dp(44f), dp(44f), Gravity.BOTTOM or Gravity.END)
                 .apply { setMargins(0, 0, dp(14f), dp(14f)) })
         return view
@@ -398,9 +398,9 @@ class MainActivity : Activity(), SensorEventListener {
         setOnClickListener { onClick() }
     }
 
-    /** Runs a script in the site's view (never in the panel). */
-    private fun siteJs(script: String) {
-        pageWebView?.let { if (!destroyed) it.evaluateJavascript(script, null) }
+    /** Runs a script in the panel (the site's view has no bridge and no such functions). */
+    private fun panelJs(script: String) {
+        if (!destroyed && hasWeb) web.evaluateJavascript(script, null)
     }
 
     /**
@@ -424,8 +424,8 @@ class MainActivity : Activity(), SensorEventListener {
                     kotlin.math.abs(event.x - downX) > dp(56f) &&
                     kotlin.math.abs(event.y - downY) < dp(70f)) {
                     fromEdge = false
-                    if (event.x > downX) siteJs("window.pbPrevPage && window.pbPrevPage()")
-                    else siteJs("window.pbNextPage && window.pbNextPage()")
+                    if (event.x > downX) panelJs("window.pbPrevPage && window.pbPrevPage()")
+                    else panelJs("window.pbNextPage && window.pbNextPage()")
                     return true
                 }
             }
