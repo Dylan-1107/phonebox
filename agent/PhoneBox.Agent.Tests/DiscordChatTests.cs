@@ -498,6 +498,25 @@ public sealed class DiscordChatTests : IDisposable
     }
 
     [Fact]
+    public async Task A_message_deleted_in_Discord_goes_at_the_next_read()
+    {
+        var monitor = Monitor(chat: true);
+        await WithChat(monitor, async discord =>
+        {
+            Assert.Equal(["a", "b"], Texts(await Open(monitor, discord, History(("10", "a"), ("11", "b")))));
+            // the next read is due (they are 10 s apart)
+            var readAt = (Dictionary<string, long>)typeof(DiscordMonitor)
+                .GetField("_chatReadAt", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(monitor)!;
+            readAt.Clear();
+            var chat = monitor.ChatAsync(null, false, discord.Ct);
+            var read = await discord.Request("GET_CHANNEL");   // still followed: no SUBSCRIBE
+            await discord.Message("500", "12", "c");           // arrives while the read is on its way: kept
+            await discord.Answer(read, History(("10", "a")));  // 11 was deleted
+            Assert.Equal(["a", "c"], Texts(Json(await chat)));
+        });
+    }
+
+    [Fact]
     public async Task A_failed_subscription_is_asked_for_again()
     {
         var monitor = Monitor(chat: true);

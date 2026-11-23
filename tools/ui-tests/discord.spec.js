@@ -430,7 +430,7 @@ test('an action that is never answered frees the buttons again', async ({ page }
 });
 
 // the chat (discord.chat in the settings); answers: url part -> a function of the demo's answer, for what the demo doesn't do
-async function showChat(page, { chat = true, options = { control: true }, answers = null, allowControl = false } = {}) {
+async function showChat(page, { chat = true, options = { control: true }, answers = null, allowControl = false, screenShare = false } = {}) {
   if (answers) {
     await page.addInitScript((answers) => {
       window.__chat = [];
@@ -457,14 +457,28 @@ async function showChat(page, { chat = true, options = { control: true }, answer
     }, answers);
   }
   await page.goto('/panel/');
-  await page.evaluate(([chat, options, allowControl]) => {
+  await page.evaluate(([chat, options, allowControl, screenShare]) => {
     localStorage.clear();
-    localStorage.setItem('pb-demo-config', JSON.stringify({ night: { enabled: false }, rules: [], shortcuts: [], discord: { chat, allowControl },
+    localStorage.setItem('pb-demo-config', JSON.stringify({ night: { enabled: false }, rules: [], shortcuts: [], discord: { chat, allowControl, screenShare },
       pages: [{ id: 'dc', title: 'Discord', enabled: true, widgets: [{ id: 'd', type: 'discord', x: 0, y: 0, w: 6, h: 5, options }] }] }));
-  }, [chat, options, allowControl]);
+  }, [chat, options, allowControl, screenShare]);
   await page.reload();
   await expect(page.locator('.w-discord .dc-top')).toBeVisible();
 }
+
+test('the chat and the share view take turns: opening one closes the other', async ({ page }) => {
+  await showChat(page, { screenShare: true });
+  const chat = page.locator('.dc-btn.chat'), share = page.locator('.dc-btn.share');
+  await chat.click();
+  await expect(page.locator('.dc-msg').first()).toBeVisible();
+  await share.click();
+  await expect(share).toHaveClass(/\bon\b/);
+  await expect(chat).not.toHaveClass(/\bon\b/); // a chat hidden under the share view would still be read and marked seen
+  await expect(page.locator('.dc-msg')).toHaveCount(0);
+  await chat.click();
+  await expect(share).not.toHaveClass(/\bon\b/);
+  await expect(page.locator('.dc-msg').first()).toBeVisible();
+});
 
 test('without the chat setting there is no chat', async ({ page }) => {
   await showChat(page, { chat: false });

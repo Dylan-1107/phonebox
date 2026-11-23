@@ -31,6 +31,12 @@
   [AlberBM](https://github.com/AlberBM)).
 - Page buttons: a new widget with one button per page (all of them, or the ones you tick), the page you are on
   highlighted. Put it on the home page to use it as a launcher for the others.
+- Discord: a read-only chat in the widget, for the voice channel you're in or a text channel you pick, with a dot on
+  💬 when someone writes in a channel you opened there. It has its own switch in **Settings › General › Discord**,
+  off by default; Discord asks to approve PhoneBox again for reading messages. Message text stays in the agent's
+  memory and is never logged; **Open in Discord** needs the widget's **Control** (#356, #368, #429,
+  [AlberBM](https://github.com/AlberBM), tested against Discord by
+  [DushyantRajpurohit](https://github.com/DushyantRajpurohit)).
 
 **Agent**
 - Phone app updates: a phone that cannot take a streamed install (`splice failed: EINVAL`, seen with Android 15 on a

@@ -187,7 +187,13 @@ public sealed partial class DiscordMonitor
         lock (_chatLock) id = _chatChannel;
         id ??= _snap.ChannelId;
         if (id is null) return "no channel";
-        try { await Request("SELECT_TEXT_CHANNEL", new JsonObject { ["channel_id"] = id }, null, CancellationToken.None); return null; }
+        // checked again as the frame goes out: Control or the chat turned off while another write held the pipe
+        try
+        {
+            await Request("SELECT_TEXT_CHANNEL", new JsonObject { ["channel_id"] = id }, null, CancellationToken.None,
+                stillValid: () => WidgetControl(config.Get()) && ChatOn);
+            return null;
+        }
         catch (Exception ex) { return ex.Message; }
     }
 
@@ -219,9 +225,14 @@ public sealed partial class DiscordMonitor
         lock (_chatLock)
             if (_chatMsgs.TryGetValue(channel, out var cached) && _chatReadAt.TryGetValue(channel, out var readAt) && Environment.TickCount64 - readAt < 10_000)
                 return [.. cached];
+        // what was kept before this read: the read's answer replaces it (a deleted message goes), only messages that
+        // arrived while it was on its way are added to it
+        HashSet<string> before;
+        lock (_chatLock) before = _chatMsgs.TryGetValue(channel, out var kept) ? [.. kept.Select(m => m.Id)] : [];
         try
         {
-            var data = await Request("GET_CHANNEL", new JsonObject { ["channel_id"] = channel }, null, ct);
+            // the chat turned off after the caller looked: no read goes to Discord
+            var data = await Request("GET_CHANNEL", new JsonObject { ["channel_id"] = channel }, null, ct, stillValid: () => ChatOn);
             var names = new Dictionary<string, string>();
             lock (_chatLock) foreach (var c in _guildText.Values.SelectMany(l => l)) names.TryAdd(c.Id, c.Name);
             var list = (data?["messages"] as JsonArray ?? []).OfType<JsonObject>().Select(m => ParseMessage(m, names)).OfType<DiscordChatMessage>()
@@ -232,7 +243,8 @@ public sealed partial class DiscordMonitor
                 if (!_chatFollowed.Contains(channel)) return list; // not followed (any more): show, don't keep
                 // messages that arrived while the history was on its way are newer than what it holds
                 var newest = list.Count > 0 ? list[^1].Id : null;
-                if (_chatMsgs.TryGetValue(channel, out var live)) list = [.. list.Concat(live.Where(m => Newer(m.Id, newest))).TakeLast(ChatMessages)];
+                if (_chatMsgs.TryGetValue(channel, out var live))
+                    list = [.. list.Concat(live.Where(m => !before.Contains(m.Id) && Newer(m.Id, newest))).TakeLast(ChatMessages)];
                 _chatMsgs[channel] = list;
                 _chatReadAt[channel] = Environment.TickCount64;
                 var fromOthers = list.LastOrDefault(m => m.AuthorId != _meId)?.Id;
@@ -243,7 +255,7 @@ public sealed partial class DiscordMonitor
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             log.LogDebug("discord: reading a channel: {Msg}", ex.Message); // never the text
-            lock (_chatLock) return _chatMsgs.TryGetValue(channel, out var old) ? [.. old] : [];
+            lock (_chatLock) return ChatOn && _chatMsgs.TryGetValue(channel, out var old) ? [.. old] : [];
         }
     }
 

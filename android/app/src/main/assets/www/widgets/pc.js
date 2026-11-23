@@ -355,7 +355,8 @@ W.discord = {
         const b = labelled(h('button', 'dc-btn share' + (shareOpen ? ' on' : ''), emo('🖥️')), t(shareOpen ? 'w.discord.closeShare' : 'w.discord.share'));
         b.addEventListener('click', () => {
           haptic(); shareOpen = !shareOpen;
-          if (shareOpen) { share = null; loadShare().then(() => render(true)); }
+          // one view at a time: a chat hidden under the share view would still be read and marked as seen
+          if (shareOpen) { chatOpen = false; picking = false; pickGuild = null; share = null; loadShare().then(() => render(true)); }
           render(true);
         });
         return b;
@@ -374,7 +375,7 @@ W.discord = {
           t(chatOpen ? 'w.discord.closeChat' : 'w.discord.chat'));
         chatBtn.addEventListener('click', () => {
           haptic(); chatOpen = !chatOpen; picking = false; pickGuild = null;
-          if (chatOpen) { chat = null; loadChat().then(() => render(true)); }
+          if (chatOpen) { shareOpen = false; chat = null; loadChat().then(() => render(true)); }
           render(true);
         });
       } else chatOpen = false;
