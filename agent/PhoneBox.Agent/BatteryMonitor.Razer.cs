@@ -290,14 +290,14 @@ public sealed partial class BatteryMonitor
     }
 
     /// <summary>
-    /// Merges Razer HID readings by product name (preferring an entry with charging state when both a cable
-    /// and a wireless dongle for the same model are connected) into the Bluetooth list without collapsing
-    /// duplicate Bluetooth entries.
+    /// Merges vendor HID readings (Razer, Rapoo, bytech) by product name into the Bluetooth list,
+    /// preferring an entry with charging state when both a cable and a wireless dongle for the same
+    /// model are connected, without collapsing duplicate Bluetooth entries.
     /// </summary>
-    internal static List<DeviceBattery> MergeRazerIntoBluetooth(IEnumerable<DeviceBattery> bluetooth, IEnumerable<DeviceBattery> razer)
+    internal static List<DeviceBattery> MergeHidIntoBluetooth(IEnumerable<DeviceBattery> bluetooth, IEnumerable<DeviceBattery> hid)
     {
         var list = bluetooth.ToList();
-        foreach (var r in razer)
+        foreach (var r in hid)
         {
             var idx = list.FindIndex(b => string.Equals(b.Name, r.Name, StringComparison.OrdinalIgnoreCase));
             if (idx < 0)
@@ -308,13 +308,12 @@ public sealed partial class BatteryMonitor
         return list;
     }
 
-    private static bool PreferDevice(DeviceBattery candidate, DeviceBattery existing)
+    internal static bool PreferDevice(DeviceBattery candidate, DeviceBattery existing)
         => (candidate.Charging is not null && existing.Charging is null)
             || (candidate.Charging == true && existing.Charging != true)
             || (candidate.Charging == existing.Charging && candidate.Level > existing.Level);
 
 #if WINDOWS
-    private static readonly Guid HidInterfaceGuid = new("4D1E55B2-F16F-11CF-88CB-001111000030");
     // Synapse 4 runs as RazerAppEngine; Synapse 3 runs as Razer Synapse 3 / Razer Synapse Service.
     private static readonly string[] SynapseProcessNames =
         ["RazerAppEngine", "Razer Synapse 3", "Razer Synapse Service", "RazerSynapse"];
@@ -329,74 +328,53 @@ public sealed partial class BatteryMonitor
 
         try
         {
-            var guid = HidInterfaceGuid;
-            var set = SetupDiGetClassDevs(ref guid, IntPtr.Zero, IntPtr.Zero, 0x02 | 0x10); // DIGCF_PRESENT | DIGCF_DEVICEINTERFACE
-            if (set == IntPtr.Zero || set == new IntPtr(-1)) return ([], null);
-
-            try
+            foreach (var iface in EnumerateHidInterfaces(RazerVendorId, deadline))
             {
-                var ifData = new SP_DEVICE_INTERFACE_DATA { cbSize = (uint)Marshal.SizeOf<SP_DEVICE_INTERFACE_DATA>() };
-                var devData = new SP_DEVINFO_DATA { cbSize = (uint)Marshal.SizeOf<SP_DEVINFO_DATA>() };
-                for (uint i = 0; Environment.TickCount64 < deadline && SetupDiEnumDeviceInterfaces(set, IntPtr.Zero, ref guid, i, ref ifData); i++)
+                try
                 {
-                    SetupDiGetDeviceInterfaceDetailW(set, ref ifData, IntPtr.Zero, 0, out var req, IntPtr.Zero);
-                    if (req == 0) continue;
+                    if (handledDevices.Contains(iface.PhysicalId)) continue;
 
-                    var mem = Marshal.AllocHGlobal((int)req);
-                    try
+                    using var handle = CreateFileW(iface.Path, 0, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
+                    if (handle.IsInvalid) continue;
+
+                    var attrs = new HIDD_ATTRIBUTES { Size = (uint)Marshal.SizeOf<HIDD_ATTRIBUTES>() };
+                    if (!HidD_GetAttributes(handle, ref attrs) || attrs.VendorID != RazerVendorId) continue;
+
+                    int pid = attrs.ProductID;
+                    if (!RazerDevices.ContainsKey(pid)) continue;
+                    if (!TryGetHidCaps(handle, out var caps)) continue;
+
+                    DeviceBattery? dev = null;
+                    if (RazerPaPids.Contains(pid))
                     {
-                        Marshal.WriteInt32(mem, IntPtr.Size == 8 ? 8 : 6);
-                        if (!SetupDiGetDeviceInterfaceDetailW(set, ref ifData, mem, req, out _, ref devData)) continue;
-                        var path = Marshal.PtrToStringUni(IntPtr.Add(mem, 4));
-                        if (string.IsNullOrEmpty(path) || !path.Contains("vid_1532", StringComparison.OrdinalIgnoreCase)) continue;
-
-                        var physicalId = GetPhysicalDeviceId(path, devData.DevInst);
-                        if (handledDevices.Contains(physicalId)) continue;
-
-                        using var handle = CreateFileW(path, 0, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
-                        if (handle.IsInvalid) continue;
-
-                        var attrs = new HIDD_ATTRIBUTES { Size = (uint)Marshal.SizeOf<HIDD_ATTRIBUTES>() };
-                        if (!HidD_GetAttributes(handle, ref attrs) || attrs.VendorID != RazerVendorId) continue;
-
-                        int pid = attrs.ProductID;
-                        if (!RazerDevices.ContainsKey(pid)) continue;
-                        if (!TryGetHidCaps(handle, out var caps)) continue;
-
-                        DeviceBattery? dev = null;
-                        if (RazerPaPids.Contains(pid))
+                        if (caps.UsagePage is 0xFF00 or 0xFF14
+                            && caps.InputReportByteLength == RazerPaReportLength
+                            && caps.OutputReportByteLength == RazerPaReportLength)
                         {
-                            if (caps.UsagePage is 0xFF00 or 0xFF14
-                                && caps.InputReportByteLength == RazerPaReportLength
-                                && caps.OutputReportByteLength == RazerPaReportLength)
-                            {
-                                synapseRunning ??= IsRazerSynapseRunning();
-                                // The Barracuda vendor collection is shareable; keep the established BlackShark
-                                // protection because Synapse can still own that receiver exclusively.
-                                if (pid == RazerBarracudaPid || !synapseRunning.Value)
-                                    dev = ReadRazerPaDevice(path, handle, pid, deadline);
-                            }
-                        }
-                        else if (caps.FeatureReportByteLength == RazerReportLength)
-                        {
-                            dev = ReadRazerDevice(handle, pid, deadline);
-                        }
-
-                        if (dev is not null)
-                        {
-                            handledDevices.Add(physicalId);
-                            readings.Add(dev);
+                            synapseRunning ??= IsRazerSynapseRunning();
+                            // The Barracuda vendor collection is shareable; keep the established BlackShark
+                            // protection because Synapse can still own that receiver exclusively.
+                            if (pid == RazerBarracudaPid || !synapseRunning.Value)
+                                dev = ReadRazerPaDevice(iface.Path, handle, pid, deadline);
                         }
                     }
-                    catch (Exception ex) { lastError ??= ex.Message; }
-                    finally { Marshal.FreeHGlobal(mem); }
+                    else if (caps.FeatureReportByteLength == RazerReportLength)
+                    {
+                        dev = ReadRazerDevice(handle, pid, deadline);
+                    }
+
+                    if (dev is not null)
+                    {
+                        handledDevices.Add(iface.PhysicalId);
+                        readings.Add(dev);
+                    }
                 }
+                catch (Exception ex) { lastError ??= ex.Message; }
             }
-            finally { SetupDiDestroyDeviceInfoList(set); }
         }
         catch (Exception ex) { lastError ??= ex.Message; }
 
-        return (MergeRazerIntoBluetooth([], readings), lastError);
+        return (readings, lastError);
     }
 
     private static bool IsRazerSynapseRunning()
@@ -414,35 +392,6 @@ public sealed partial class BatteryMonitor
             }
         }
         return false;
-    }
-
-    private static string GetPhysicalDeviceId(string path, uint devInst)
-    {
-        // Walk up from HID\... to the parent USB device node so multiple interfaces on one receiver share one ID,
-        // while two identical receivers on different USB ports stay distinct.
-        uint current = devInst;
-        for (int hop = 0; hop < 3; hop++)
-        {
-            if (CM_Get_Parent(out var parent, current, 0) != 0) break;
-            current = parent;
-            var buf = new char[256];
-            if (CM_Get_Device_IDW(current, buf, buf.Length, 0) == 0)
-            {
-                var id = new string(buf).TrimEnd('\0');
-                if (id.StartsWith("USB\\", StringComparison.OrdinalIgnoreCase)
-                    && !id.Contains("&MI_", StringComparison.OrdinalIgnoreCase))
-                    return id;
-            }
-        }
-        return devInst != 0 ? $"devinst:{devInst}" : path;
-    }
-
-    private static bool TryGetHidCaps(SafeFileHandle handle, out HIDP_CAPS caps)
-    {
-        caps = default;
-        if (!HidD_GetPreparsedData(handle, out var pp)) return false;
-        try { return HidP_GetCaps(pp, out caps) >= 0; }
-        finally { HidD_FreePreparsedData(pp); }
     }
 
     private static (string Name, string? Kind) ResolveRazerNameAndKind(SafeFileHandle handle, int pid)
@@ -487,7 +436,7 @@ public sealed partial class BatteryMonitor
 
         for (int i = 0; i < 16 && Environment.TickCount64 < deadline; i++)
         {
-            var (drained, fatal) = ReadPaOverlapped(rwHandle, RazerPaReportLength, 10);
+            var (drained, fatal) = ReadHidReport(rwHandle, RazerPaReportLength, 10);
             if (fatal || drained is null) break;
         }
 
@@ -498,7 +447,7 @@ public sealed partial class BatteryMonitor
         var woke = false;
         for (int attempt = 0; attempt < (barracuda ? 3 : 1) && Environment.TickCount64 < deadline; attempt++)
         {
-            if (WritePaOverlapped(rwHandle, Remote(true), 200)) { woke = true; break; }
+            if (WriteHidReport(rwHandle, Remote(true), 200)) { woke = true; break; }
             Thread.Sleep(150 * (attempt + 1));
         }
         if (!woke) return null;
@@ -517,7 +466,7 @@ public sealed partial class BatteryMonitor
         finally
         {
             // Restore remote mode off only when our initial "on" write succeeded.
-            WritePaOverlapped(rwHandle, Remote(false), 150);
+            WriteHidReport(rwHandle, Remote(false), 150);
         }
     }
 
@@ -526,12 +475,12 @@ public sealed partial class BatteryMonitor
         var query = barracuda ? BuildRazerBarracudaQueryFrame(cmdId) : BuildRazerPaQueryFrame(cmdId);
         for (int attempt = 0; attempt < (barracuda ? 4 : 2) && Environment.TickCount64 < deadline; attempt++)
         {
-            if (!WritePaOverlapped(handle, query, 200)) break;
+            if (!WriteHidReport(handle, query, 200)) break;
 
             var replyDeadline = Math.Min(deadline, Environment.TickCount64 + 180);
             while (Environment.TickCount64 < replyDeadline)
             {
-                var (reply, fatal) = ReadPaOverlapped(handle, RazerPaReportLength, 50);
+                var (reply, fatal) = ReadHidReport(handle, RazerPaReportLength, 50);
                 if (fatal) return null;
                 if (reply is null) continue;
                 var val = barracuda ? ParseRazerBarracudaReply(reply, cmdId) : ParseRazerPaReply(reply, cmdId);
@@ -541,123 +490,7 @@ public sealed partial class BatteryMonitor
         return null;
     }
 
-    private static bool WritePaOverlapped(SafeFileHandle handle, byte[] data, int timeoutMs)
-        => PaOverlappedIo(isWrite: true, handle, data, timeoutMs) == data.Length;
-
-    private static (byte[]? Data, bool FatalError) ReadPaOverlapped(SafeFileHandle handle, int len, int timeoutMs)
-    {
-        var buf = new byte[len];
-        var read = PaOverlappedIo(isWrite: false, handle, buf, timeoutMs);
-        if (read == -2) return (null, true);
-        if (read <= 0) return (null, false);
-        if (read < len) Array.Resize(ref buf, read);
-        return (buf, false);
-    }
-
-    private static int PaOverlappedIo(bool isWrite, SafeFileHandle handle, byte[] buf, int timeoutMs)
-    {
-        var ev = CreateEventW(IntPtr.Zero, true, false, IntPtr.Zero);
-        if (ev == IntPtr.Zero) return -2;
-        var pinBuf = GCHandle.Alloc(buf, GCHandleType.Pinned);
-        var ovMem = Marshal.AllocHGlobal(Marshal.SizeOf<OVERLAPPED>());
-        var ioPending = false;
-        try
-        {
-            Marshal.StructureToPtr(new OVERLAPPED { hEvent = ev }, ovMem, false);
-            var ok = isWrite
-                ? WriteFile(handle, pinBuf.AddrOfPinnedObject(), (uint)buf.Length, IntPtr.Zero, ovMem)
-                : ReadFile(handle, pinBuf.AddrOfPinnedObject(), (uint)buf.Length, IntPtr.Zero, ovMem);
-            if (!ok)
-            {
-                if (Marshal.GetLastWin32Error() != 997) return -2; // immediate error (e.g. unplugged)
-                ioPending = true;
-                if (WaitForSingleObject(ev, (uint)timeoutMs) == 0)
-                {
-                    ioPending = false;
-                }
-                else
-                {
-                    CancelIoEx(handle, ovMem);
-                    if (WaitForSingleObject(ev, 200) != 0)
-                        return -2; // driver did not complete cancellation in time; keep buffer pinned in finally
-                    ioPending = false;
-                    // If the operation completed just before CancelIoEx took effect, preserve the completion.
-                    if (GetOverlappedResult(handle, ovMem, out var lateTransferred, false))
-                        return (int)lateTransferred;
-                    return -1; // timeout
-                }
-            }
-            if (!GetOverlappedResult(handle, ovMem, out var transferred, false)) return -2;
-            return (int)transferred;
-        }
-        finally
-        {
-            if (!ioPending)
-            {
-                Marshal.FreeHGlobal(ovMem);
-                pinBuf.Free();
-                CloseHandle(ev);
-            }
-        }
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct SP_DEVICE_INTERFACE_DATA { public uint cbSize; public Guid InterfaceClassGuid; public uint Flags; public IntPtr Reserved; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct HIDD_ATTRIBUTES { public uint Size; public ushort VendorID; public ushort ProductID; public ushort VersionNumber; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct HIDP_CAPS
-    {
-        public ushort Usage; public ushort UsagePage;
-        public ushort InputReportByteLength; public ushort OutputReportByteLength; public ushort FeatureReportByteLength;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 17)] public ushort[] Reserved;
-        public ushort NumberLinkCollectionNodes; public ushort NumberInputButtonCaps; public ushort NumberInputValueCaps;
-        public ushort NumberInputDataIndices; public ushort NumberOutputButtonCaps; public ushort NumberOutputValueCaps;
-        public ushort NumberOutputDataIndices; public ushort NumberFeatureButtonCaps; public ushort NumberFeatureValueCaps;
-        public ushort NumberFeatureDataIndices;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct OVERLAPPED { public IntPtr Internal; public IntPtr InternalHigh; public int Offset; public int OffsetHigh; public IntPtr hEvent; }
-
-    [DllImport("setupapi.dll", SetLastError = true)]
-    private static extern IntPtr SetupDiGetClassDevs(ref Guid classGuid, IntPtr enumerator, IntPtr hwndParent, uint flags);
-    [DllImport("setupapi.dll", SetLastError = true)]
-    private static extern bool SetupDiEnumDeviceInterfaces(IntPtr set, IntPtr data, ref Guid classGuid, uint index, ref SP_DEVICE_INTERFACE_DATA ifData);
-    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool SetupDiGetDeviceInterfaceDetailW(IntPtr set, ref SP_DEVICE_INTERFACE_DATA ifData, IntPtr detail, uint size, out uint required, IntPtr data);
-    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool SetupDiGetDeviceInterfaceDetailW(IntPtr set, ref SP_DEVICE_INTERFACE_DATA ifData, IntPtr detail, uint size, out uint required, ref SP_DEVINFO_DATA data);
-
-    [DllImport("cfgmgr32.dll")]
-    private static extern uint CM_Get_Parent(out uint parent, uint devInst, uint flags);
-    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
-    private static extern uint CM_Get_Device_IDW(uint devInst, char[] buffer, int bufferLen, uint flags);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern SafeFileHandle CreateFileW(string fileName, uint access, uint share, IntPtr sec, uint disp, uint flags, IntPtr template);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool ReadFile(SafeFileHandle handle, IntPtr buf, uint len, IntPtr bytesRead, IntPtr overlapped);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool WriteFile(SafeFileHandle handle, IntPtr buf, uint len, IntPtr bytesWritten, IntPtr overlapped);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GetOverlappedResult(SafeFileHandle handle, IntPtr overlapped, out uint transferred, [MarshalAs(UnmanagedType.Bool)] bool wait);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CancelIoEx(SafeFileHandle handle, IntPtr overlapped);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr CreateEventW(IntPtr sec, [MarshalAs(UnmanagedType.Bool)] bool manualReset, [MarshalAs(UnmanagedType.Bool)] bool initialState, IntPtr name);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern uint WaitForSingleObject(IntPtr handle, uint ms);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CloseHandle(IntPtr handle);
-
-    [DllImport("hid.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.U1)] private static extern bool HidD_GetAttributes(SafeFileHandle handle, ref HIDD_ATTRIBUTES attrs);
     [DllImport("hid.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.U1)] private static extern bool HidD_GetProductString(SafeFileHandle handle, StringBuilder buf, uint len);
-    [DllImport("hid.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.U1)] private static extern bool HidD_GetPreparsedData(SafeFileHandle handle, out IntPtr pp);
-    [DllImport("hid.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.U1)] private static extern bool HidD_FreePreparsedData(IntPtr pp);
-    [DllImport("hid.dll", SetLastError = true)] private static extern int HidP_GetCaps(IntPtr pp, out HIDP_CAPS caps);
     [DllImport("hid.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.U1)] private static extern bool HidD_SetFeature(SafeFileHandle handle, byte[] buf, uint len);
     [DllImport("hid.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.U1)] private static extern bool HidD_GetFeature(SafeFileHandle handle, byte[] buf, uint len);
 #endif

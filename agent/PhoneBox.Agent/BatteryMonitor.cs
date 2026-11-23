@@ -25,7 +25,9 @@ public sealed partial class BatteryMonitor(ILogger<BatteryMonitor> log) : Backgr
     private readonly object _publishLock = new();
     private IReadOnlyList<DeviceBattery> _btDevices = [];
     private IReadOnlyList<DeviceBattery> _razerDevices = [];
-    private Task? _razerTask;
+    private IReadOnlyList<DeviceBattery> _vendorDevices = [];
+    private readonly Dictionary<string, (DeviceBattery Device, long At)> _vendorLastGood = new(StringComparer.OrdinalIgnoreCase);
+    private Task? _hidTask;
 #endif
     private long _lastRequest = NoRequest;
     private long? _readAt;
@@ -53,21 +55,42 @@ public sealed partial class BatteryMonitor(ILogger<BatteryMonitor> log) : Backgr
                     lock (_publishLock)
                     {
                         _btDevices = bt;
-                        _devices = SortDevices(MergeRazerIntoBluetooth(_btDevices, _razerDevices));
+                        Publish();
                     }
                 }
                 catch (Exception ex) { log.LogDebug("batteries: {Msg}", ex.Message); }
 
-                if (_razerTask is null || _razerTask.IsCompleted)
+                if (_hidTask is null || _hidTask.IsCompleted)
                 {
-                    _razerTask = Task.Run(() =>
+                    _hidTask = Task.Run(() =>
                     {
-                        var (razer, error) = WindowsRazer();
-                        if (error is not null) log.LogDebug("batteries (razer): {Msg}", error);
+                        var deadline = Environment.TickCount64 + VendorHidBudgetMs;
+                        var samples = new List<HidSample>();
+
+                        try
+                        {
+                            var (rapoo, error) = WindowsRapoo(deadline);
+                            samples.AddRange(rapoo);
+                            if (error is not null) log.LogDebug("batteries (rapoo): {Msg}", error);
+                        }
+                        catch (Exception ex) { log.LogDebug("batteries (rapoo): {Msg}", ex.Message); }
+
+                        try
+                        {
+                            var (bytech, error) = WindowsBytech(deadline);
+                            samples.AddRange(bytech);
+                            if (error is not null) log.LogDebug("batteries (bytech): {Msg}", error);
+                        }
+                        catch (Exception ex) { log.LogDebug("batteries (bytech): {Msg}", ex.Message); }
+
+                        var (razer, razerError) = WindowsRazer();
+                        if (razerError is not null) log.LogDebug("batteries (razer): {Msg}", razerError);
+
                         lock (_publishLock)
                         {
                             _razerDevices = razer;
-                            _devices = SortDevices(MergeRazerIntoBluetooth(_btDevices, _razerDevices));
+                            _vendorDevices = SortDevices(ResolveHidSamples(samples, _vendorLastGood, Environment.TickCount64));
+                            Publish();
                         }
                     }, ct);
                 }
@@ -82,6 +105,12 @@ public sealed partial class BatteryMonitor(ILogger<BatteryMonitor> log) : Backgr
 
     private static List<DeviceBattery> SortDevices(IEnumerable<DeviceBattery> list)
         => list.OrderBy(d => d.Kind == "laptop" ? 1 : 0).ThenBy(d => d.Name).ToList();
+
+#if WINDOWS
+    /// <summary>Bluetooth first, then vendor HID readings, with same-name entries merged. Caller holds the lock.</summary>
+    private void Publish()
+        => _devices = SortDevices(MergeHidIntoBluetooth(MergeHidIntoBluetooth(_btDevices, _razerDevices), _vendorDevices));
+#endif
 
 #if !WINDOWS
     private static IReadOnlyList<DeviceBattery> Read()

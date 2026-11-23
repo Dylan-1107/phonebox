@@ -167,7 +167,7 @@ public class BatteryTests
         => Assert.Equal(expectedKind, BatteryMonitor.RazerKindFromPid(pid));
 
     [Fact]
-    public void MergeRazerIntoBluetooth_PreservesBluetoothDuplicatesAndCollapsesCableWithDongle()
+    public void MergeHidIntoBluetooth_PreservesBluetoothDuplicatesAndCollapsesCableWithDongle()
     {
         var bluetooth = new[]
         {
@@ -182,7 +182,7 @@ public class BatteryTests
             new DeviceBattery("Razer BlackWidow V3 Pro", 80, "keyboard", false),
         };
 
-        var merged = BatteryMonitor.MergeRazerIntoBluetooth(bluetooth, hid);
+        var merged = BatteryMonitor.MergeHidIntoBluetooth(bluetooth, hid);
         Assert.Equal(4, merged.Count);
         Assert.Equal(2, merged.Count(d => string.Equals(d.Name, "Office Mouse", StringComparison.OrdinalIgnoreCase)));
         var mouse = Assert.Single(merged, d => d.Name == "Razer Basilisk V3 Pro");

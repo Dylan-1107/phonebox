@@ -14,6 +14,12 @@
   the new one is in place. `scripts/build.sh` builds a .dmg on a Mac or a .tar.gz on Linux from a checkout (#436,
   #437, [Vasilispapg](https://github.com/Vasilispapg)).
 
+**Agent**
+- Windows: wireless Rapoo mice (24AE:1215 on the 2.4 GHz receiver, 24AE:4415 on the cable) and bytech-firmware AULA
+  keyboards (0C45:FEF9) show their battery in the Device batteries widget, read over their own receivers without the
+  vendor software. A receiver that stops answering while the device sleeps keeps its last reading instead of making
+  the row disappear, and a sleeping keyboard is only polled again after a short back-off.
+
 ## 0.9.29 — 2026-11-23
 
 A shared mouse (Input Leaf, Deskflow) works in the panel, a sideways swipe on a list turns the page, a large Discord
