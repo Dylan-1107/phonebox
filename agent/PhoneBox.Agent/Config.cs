@@ -73,8 +73,8 @@ public sealed class AgentConfig
         pages = PagesFor(deviceId).Select(p => new
         {
             p.Id, p.Title, p.Icon, p.Enabled, p.IdleSec, p.Appearance,
-            // a page of kind "web": the phone shows Url in a browser view of its own instead of a grid of widgets
-            p.Kind, p.Url,
+            // a page of kind "web": the phone shows these sites in a browser view of its own instead of widgets
+            p.Kind, p.Url, p.Sites,
             widgets = (p.Widgets ?? []).Select(w => new
             {
                 w.Id, w.Type, w.X, w.Y, w.W, w.H, w.Appearance,
@@ -316,8 +316,10 @@ public sealed class PageConfig
     /// <summary>"web": the phone shows <see cref="Url"/> full-screen in its own browser view instead of a grid of
     /// widgets. Null (or anything else): the usual grid.</summary>
     public string? Kind { get; set; }
-    /// <summary>The address of a "web" page (http or https). Ignored by grid pages.</summary>
+    /// <summary>The first address of a "web" page (http or https); kept for older configs, Sites wins.</summary>
     public string? Url { get; set; }
+    /// <summary>The fixed sites of a "web" page, in the order the phone shows their tabs.</summary>
+    public List<PageSite>? Sites { get; set; }
 
     /// <summary>Create the page from this template (templates.json) when it has no widgets yet.</summary>
     public string? Template { get; set; }
@@ -325,6 +327,13 @@ public sealed class PageConfig
     public string? Type { get; set; }
     /// <summary>Pre-0.6.2 page options; migrated to widget options on load.</summary>
     public Dictionary<string, JsonElement>? Options { get; set; }
+}
+
+/// <summary>One site on a "web" page: the name on its tab and the address it opens.</summary>
+public sealed class PageSite
+{
+    public string Name { get; set; } = "";
+    public string Url { get; set; } = "";
 }
 
 public sealed class WidgetConfig
@@ -881,9 +890,27 @@ public sealed partial class ConfigStore(string path)
             p.Kind = string.Equals(p.Kind, "web", StringComparison.OrdinalIgnoreCase) ? "web" : null;
             if (p.Kind == "web")
             {
-                p.Url = NormalizeWebUrl(p.Url);
-                if (p.Url is null) p.Kind = null;
+                // Sites is the list the phone shows as tabs; an older page with just Url becomes one site.
+                var sites = new List<PageSite>();
+                foreach (var site in p.Sites ?? [])
+                {
+                    var url = NormalizeWebUrl(site?.Url);
+                    if (url is null || sites.Any(x => x.Url == url)) continue;
+                    var name = (site!.Name ?? "").Trim();
+                    if (name.Length == 0) name = new Uri(url).Host;
+                    sites.Add(new PageSite { Name = name.Length > 40 ? name[..40] : name, Url = url });
+                }
+                if (NormalizeWebUrl(p.Url) is { } legacy && sites.All(x => x.Url != legacy))
+                    sites.Insert(0, new PageSite { Name = new Uri(legacy).Host, Url = legacy });
+                if (sites.Count > 12) sites = sites.Take(12).ToList();
+                p.Sites = sites;
+                p.Url = sites.Count > 0 ? sites[0].Url : null;
+                if (sites.Count == 0) p.Kind = null;
                 else p.Widgets = [];
+            }
+            else
+            {
+                p.Sites = null;
             }
             var tpl = Catalog.Template(p.Template ?? p.Type);
             if ((p.Widgets is null || p.Widgets.Count == 0) && tpl is not null)

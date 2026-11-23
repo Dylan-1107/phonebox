@@ -65,8 +65,8 @@ class MainActivity : Activity(), SensorEventListener {
     private lateinit var root: FrameLayout
     /** The full-screen browser view of a page of kind "web". Null until such a page is first shown. */
     private var pageWebView: WebView? = null
-    /** Transparent controls over a full-screen site: the way out and the previous/next page pills. */
-    private var pageWebChrome: FrameLayout? = null
+    /** The configured address the browser view is showing (not the page the user navigated to inside it). */
+    private var siteUrl: String? = null
     /** A site's microphone request waiting for the Android permission dialog. */
     private var pendingWebMic: PermissionRequest? = null
     /** False when Android could not start its WebView (#385): the activity then only shows why. */
@@ -330,21 +330,17 @@ class MainActivity : Activity(), SensorEventListener {
         return true
     }
 
-    /**
-     * The browser view of a page of kind "web" (PageConfig.Kind in the agent). It is a WebView of its own, laid over
-     * the panel, with no JavaScript bridge attached: a site shown here can reach nothing of the phone.
-     */
     private fun dp(value: Float): Int = (resources.displayMetrics.density * value).toInt()
 
     /**
-     * The browser view of a page of kind "web" (PageConfig.Kind in the agent). It is a WebView of its own, laid over
-     * the panel, with no JavaScript bridge attached: a site shown here can reach nothing of the phone. It fills the
-     * screen; the few controls it needs float over it as small translucent pills.
+     * The browser view of a page of kind "web" (PageConfig.Kind in the agent): a WebView of its own, placed over the
+     * site area of that page's card, with no JavaScript bridge attached - a site shown here can reach nothing of the
+     * phone. The card and its tabs stay in the panel; only a small "Panel" pill floats over the site.
      */
     private fun pageWeb(): WebView {
         pageWebView?.let { return it }
-        val view = SiteWebView(this)
-        view.setBackgroundColor(0xFF000000.toInt())
+        val view = WebView(this)
+        view.setBackgroundColor(0xFF0B0E12.toInt())
         with(view.settings) {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -360,104 +356,58 @@ class MainActivity : Activity(), SensorEventListener {
         }
         // every link stays in this view: no separate browser opens on top of the panel
         view.webViewClient = WebViewClient()
-        root.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // rounded like the card's site area (bx-body: 14dp)
+        view.outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(v: View, outline: android.graphics.Outline) {
+                outline.setRoundRect(0, 0, v.width, v.height, dp(14f).toFloat())
+            }
+        }
+        view.clipToOutline = true
+        root.addView(view, FrameLayout.LayoutParams(0, 0))
         view.visibility = View.GONE
         pageWebView = view
-
-        // Transparent chrome: nothing but these pills takes a touch, everything else belongs to the site.
-        val chrome = FrameLayout(this)
-        chrome.isClickable = false
-        chrome.isFocusable = false
-        root.addView(chrome, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        chrome.visibility = View.GONE
-        pageWebChrome = chrome
-
-        chrome.addView(pill(getString(R.string.web_back_to_panel)) { closePageWeb() },
-            FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34f), Gravity.TOP or Gravity.START)
-                .apply { setMargins(dp(10f), dp(10f), 0, 0) })
-        chrome.addView(pill("‹") { panelJs("window.pbPrevPage && window.pbPrevPage()") },
-            FrameLayout.LayoutParams(dp(44f), dp(44f), Gravity.BOTTOM or Gravity.START)
-                .apply { setMargins(dp(14f), 0, 0, dp(14f)) })
-        chrome.addView(pill("›") { panelJs("window.pbNextPage && window.pbNextPage()") },
-            FrameLayout.LayoutParams(dp(44f), dp(44f), Gravity.BOTTOM or Gravity.END)
-                .apply { setMargins(0, 0, dp(14f), dp(14f)) })
         return view
     }
 
-    /** A small translucent control over the site. */
-    private fun pill(text: String, onClick: () -> Unit): android.widget.TextView = android.widget.TextView(this).apply {
-        setText(text)
-        textSize = 15f
-        setTextColor(0xE6FFFFFF.toInt())
-        gravity = Gravity.CENTER
-        setPadding(dp(12f), 0, dp(12f), 0)
-        background = android.graphics.drawable.GradientDrawable().apply {
-            cornerRadius = dp(17f).toFloat()
-            setColor(0x73000000)
-        }
-        setOnClickListener { onClick() }
+    /** Places a view at the site-area rectangle the panel measured, given in CSS pixels. */
+    private fun placeAt(view: View?, left: Float, top: Float, width: Float, height: Float) {
+        if (view == null) return
+        val density = resources.displayMetrics.density
+        val l = (left * density).toInt()
+        val t = (top * density).toInt()
+        val w = (width * density).toInt()
+        val h = (height * density).toInt()
+        val lp = view.layoutParams as FrameLayout.LayoutParams
+        if (lp.leftMargin == l && lp.topMargin == t && lp.width == w && lp.height == h) return
+        lp.leftMargin = l
+        lp.topMargin = t
+        lp.width = w
+        lp.height = h
+        view.layoutParams = lp
     }
 
-    /** Runs a script in the panel (the site's view has no bridge and no such functions). */
-    private fun panelJs(script: String) {
-        if (!destroyed && hasWeb) web.evaluateJavascript(script, null)
-    }
-
-    /**
-     * The site's WebView. A swipe that starts at the left or right edge switches to the previous or next panel page,
-     * so the page bar never has to cover the site; a swipe anywhere else is the site's own.
-     */
-    private inner class SiteWebView(context: android.content.Context) : WebView(context) {
-        private val edge = dp(26f)
-        private var downX = 0f
-        private var downY = 0f
-        private var fromEdge = false
-
-        override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-            when (event.actionMasked) {
-                android.view.MotionEvent.ACTION_DOWN -> {
-                    downX = event.x
-                    downY = event.y
-                    fromEdge = event.x < edge || event.x > width - edge
-                }
-                android.view.MotionEvent.ACTION_UP -> if (fromEdge &&
-                    kotlin.math.abs(event.x - downX) > dp(56f) &&
-                    kotlin.math.abs(event.y - downY) < dp(70f)) {
-                    fromEdge = false
-                    if (event.x > downX) panelJs("window.pbPrevPage && window.pbPrevPage()")
-                    else panelJs("window.pbNextPage && window.pbNextPage()")
-                    return true
-                }
-            }
-            return super.onTouchEvent(event)
-        }
-    }
-
-    /** Shows the browser view for [url]; the panel asks for this when a page of kind "web" comes into view. */
-    private fun showPageWeb(url: String) {
+    /** Shows [url] in the site area the panel measured for it. */
+    private fun showPageWeb(url: String, x: Float, y: Float, w: Float, h: Float) {
         // only http(s) addresses: the agent validates the same thing, but the panel is a page as well
         if (!(url.startsWith("https://") || url.startsWith("http://"))) return
+        if (!(w.isFinite() && h.isFinite() && w > 0 && h > 0)) return
         val view = pageWeb()
-        if (view.url != url) view.loadUrl(url)
+        placeAt(view, x, y, w, h)
+        // load only when the chosen site changes: pages the user opened inside a site are kept while it stays
+        if (siteUrl != url) {
+            siteUrl = url
+            view.loadUrl(url)
+        }
         if (view.visibility != View.VISIBLE) {
             view.visibility = View.VISIBLE
-            pageWebChrome?.visibility = View.VISIBLE
             view.onResume()
         }
-        view.requestFocus()
-    }
-
-    /** Leaves the browser view and asks the panel to return to its home page. */
-    private fun closePageWeb() {
-        hidePageWeb()
-        if (hasWeb) web.evaluateJavascript("window.onAndroidWebClosed && window.onAndroidWebClosed()", null)
     }
 
     private fun hidePageWeb() {
         val view = pageWebView ?: return
         if (view.visibility != View.VISIBLE) return
         view.visibility = View.GONE
-        pageWebChrome?.visibility = View.GONE
         view.onPause()
         if (hasWeb) web.requestFocus()
     }
@@ -822,12 +772,12 @@ class MainActivity : Activity(), SensorEventListener {
          * its own WebView above the panel (see pageWeb), which has no bridge: it can reach nothing of the phone.
          */
         @JavascriptInterface
-        fun webPage(key: String, action: String, url: String) {
+        fun webPage(key: String, action: String, url: String, x: Double, y: Double, w: Double, h: Double) {
             if (!ok(key)) return
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 when (action) {
-                    "show" -> showPageWeb(url.trim())
+                    "show" -> showPageWeb(url.trim(), x.toFloat(), y.toFloat(), w.toFloat(), h.toFloat())
                     "hide" -> hidePageWeb()
                 }
             }

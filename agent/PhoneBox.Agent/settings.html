@@ -1321,11 +1321,20 @@ function freeSpot(page, ww, hh, minW, minH) {
 // Widgets that arrive through Apply JSON or an imported page file can lack a grid position. Without one a drag
 // wrote NaN into x/y/w/h, JSON.stringify turned that into null and the server refused the whole save as invalid.
 const gridNum = (v, min, max, fallback) => Math.min(max, Math.max(min, Number.isFinite(v) ? Math.round(v) : fallback));
+// "Name | https://…" per line, or a bare address (the agent fills its host as the name).
+const SEP = String.fromCharCode(10);
+const parseSites = (text) => String(text || '').split(SEP).map((l) => l.trim()).filter(Boolean).map((line) => {
+  const i = line.lastIndexOf('|');
+  if (i < 0) return { name: '', url: line };
+  return { name: line.slice(0, i).trim(), url: line.slice(i + 1).trim() };
+}).filter((x) => x.url);
+
 function fitPages(pages) {
   const list = (Array.isArray(pages) ? pages : []).filter((p) => p && typeof p === 'object' && !Array.isArray(p));
   for (const p of list) {
     if (typeof p.id !== 'string') p.id = '';
     p.widgets = (Array.isArray(p.widgets) ? p.widgets : []).filter((w) => w && typeof w === 'object' && !Array.isArray(w) && typeof w.type === 'string');
+    if (p.kind === 'web') p.sites = (Array.isArray(p.sites) ? p.sites : []).filter((x) => x && typeof x.url === 'string');
     for (const w of p.widgets) {
       if (typeof w.id !== 'string') w.id = '';
       const d = widgetDef(w.type);
@@ -1410,8 +1419,7 @@ function renderPageEditor() {
             else { p.kind = null; p.url = null; }
             renderPageEditor(); changed();
           } }), h('span')), t('s.js.webPage')),
-        isWeb ? h('input', { type: 'url', value: p.url || '', placeholder: t('s.js.webAddress'), 'aria-label': t('s.js.webAddress'),
-          style: { flex: '1', minWidth: '160px' }, oninput: (e) => { p.url = e.target.value; changed(); } }) : null),
+        isWeb ? h('span', { class: 'hint' }, t('s.js.webSitesCount', { n: (p.sites || []).length })) : null),
       h('div', { class: 'row', style: { gap: '6px', marginTop: '10px' } },
         h('button', { class: 'btn sm', onclick: () => openTemplates(selPage) }, t('s.js.replaceTpl')),
         h('button', { class: 'btn sm', onclick: () => { const c = JSON.parse(JSON.stringify(p)); c.id = ''; c.title += t('s.js.dupPageSuffix'); cfg.pages.splice(selPage + 1, 0, c); selPage++; renderPages(); changed(); } }, t('s.js.dupPage')),
@@ -1431,8 +1439,16 @@ function renderPageEditor() {
         } }, t('s.js.deletePage')))));
   $('peHead').append(appearanceEditor(p, () => [cfg.display?.appearance], t('s.js.pageAppearance')));
   if (isWeb) {
-    // A web page has no widgets to arrange: the phone shows the address full-screen in its own browser view.
-    $('peRest').replaceChildren(h('p', { class: 'hint layout-hint', style: { margin: '6px 0 14px' } }, t('s.js.webPageHint')));
+    // A web page has no widgets to arrange: it shows a few fixed sites, one per tab, in the phone's browser view.
+    const sitesText = (p.sites || []).map((x) => `${x.name} | ${x.url}`).join(String.fromCharCode(10));
+    $('peRest').replaceChildren(
+      h('p', { class: 'hint layout-hint', style: { margin: '6px 0 10px' } }, t('s.js.webPageHint')),
+      h('p', { class: 'hint', style: { margin: '0 0 8px' } }, t('s.js.webSitesHint')),
+      h('textarea', { rows: '7', spellcheck: 'false',
+        style: { width: '100%', boxSizing: 'border-box', fontFamily: 'ui-monospace, Consolas, monospace', fontSize: '13px',
+          lineHeight: '1.55', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--line)',
+          background: 'var(--panel-2)', color: 'var(--text)', resize: 'vertical' },
+        oninput: (e) => { p.sites = parseSites(e.target.value); p.url = p.sites[0]?.url || null; changed(); } }, sitesText));
     showStageNote(true, p);
     queuePreview();
     return;

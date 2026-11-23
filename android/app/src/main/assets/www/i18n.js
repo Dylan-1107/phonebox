@@ -34,6 +34,10 @@
 
   const STRINGS = {
     en: {
+      'browser.panel': 'Panel',
+      'browser.title': 'Browser',
+      's.js.webSitesHint': 'One site per line: Name | https://address — each one becomes a tab on the phone. A bare address uses its host name.',
+      's.js.webSitesCount': '{n} sites — edit them on the right',
       's.js.webPage': 'Web page (show a website instead of widgets)',
       's.js.webPageHint': 'The phone opens this address full-screen in its own browser. Back goes back inside the site, and past its first page returns to the panel home page.',
       's.js.webPageNoUrl': 'No address yet',
@@ -8513,6 +8517,10 @@
       's.wh.payloadHintFull': 'Payload JSON có thể mang <code>value</code>, <code>title</code>, <code>sub</code>, <code>unit</code>, <code>icon</code>, <code>color</code>, <code>level</code> (ok / warn / error), <code>progress</code> (0&ndash;1 hoặc 0&ndash;100), <code>items</code> (một danh sách) và <code>ttl</code> (giây). Văn bản thuần hoặc một con số cũng dùng được. Thông báo nhận <code>title</code>, <code>text</code>, <code>level</code>, <code>vibrate</code>, <code>seconds</code>, <code>wake</code> (làm sáng màn hình ban đêm) và <code>page</code> (chuyển sang trang đó).',
     },
     zh: {
+      'browser.panel': '面板',
+      'browser.title': '浏览器',
+      's.js.webSitesHint': '一行一个站点：名称 | https://网址 —— 每个都会变成平板上的一个标签。只写网址就用它的域名当名称。',
+      's.js.webSitesCount': '{n} 个站点 —— 在右边编辑',
       's.js.webPage': '网页（显示网站而不是小组件）',
       's.js.webPageHint': '平板会用自己的浏览器全屏打开这个网址。按返回键先在网页里后退，退到第一页后再按返回，回到面板首页。',
       's.js.webPageNoUrl': '还没有填网址',

@@ -1433,6 +1433,31 @@ export function portraitLayout(widgets) {
 /** A page of kind "web" needs an http(s) address; without one it is drawn as an ordinary (empty) page. */
 export const webUrlOf = (p) => (p && p.kind === 'web' && typeof p.url === 'string' && /^https?:\/\//i.test(p.url.trim()) ? p.url.trim() : '');
 
+/** The fixed sites of a "web" page, in tab order: the agent's list, or the single Url of an older page. */
+export function webSitesOf(p) {
+  if (!p || p.kind !== 'web') return [];
+  const list = Array.isArray(p.sites) ? p.sites : [];
+  const sites = list
+    .filter((s) => s && typeof s.url === 'string' && /^https?:\/\//i.test(s.url.trim()))
+    .map((s) => ({ name: String(s.name || '').trim() || hostOf(s.url), url: s.url.trim() }));
+  if (!sites.length && webUrlOf(p)) sites.push({ name: hostOf(p.url), url: webUrlOf(p) });
+  return sites;
+}
+
+/** The host of an address, for a tab that has no name. */
+function hostOf(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch (_) { return String(url); }
+}
+
+/** Which tab is showing on this page: the last one picked there (kept on the phone), else the first. */
+const siteIndexOf = (p, sites) => {
+  const i = store.get('bx:' + (p.id || p.title), 0);
+  return Number.isInteger(i) && i >= 0 && i < sites.length ? i : 0;
+};
+
+/** The card of each "web" page on screen: its site area is where the app draws the browser view. */
+const webSlots = new Map();
+
 export function buildLayout() {
   const enabled = (cfg.pages || []).filter((p) => p.enabled !== false && (webUrlOf(p) || Array.isArray(p.widgets)));
   const next = enabled.length ? enabled : FALLBACK_PAGES;
@@ -1455,10 +1480,44 @@ export function buildLayout() {
     const list = Array.isArray(p.widgets) ? p.widgets : [];
     const pl = portrait ? portraitLayout(list) : null;
     if (pl) { grid.style.gridTemplateColumns = 'repeat(6, minmax(0, 1fr))'; grid.style.gridTemplateRows = `repeat(${pl.rows}, minmax(0, 1fr))`; }
-    // The app draws the website in a WebView of its own over this page (MainActivity.pageWeb). This placeholder
-    // stays behind it, and is what a browser preview of the panel shows.
-    const webUrl = webUrlOf(p);
-    if (webUrl) grid.appendChild(h('div', 'webpage', h('div', 'webpage-url', `🌐 ${webUrl}`)));
+    // A page of kind "web": one card like the Codex page's (the grid gives the same margins), a line of tabs for
+    // the fixed sites, and the site area below. The app draws the site itself in a WebView over that area
+    // (MainActivity.pageWeb); this card is what a browser preview shows.
+    const sites = webSitesOf(p);
+    if (sites.length) {
+      const sel = siteIndexOf(p, sites);
+      const card = h('div', 'w card w-browser');
+      card.style.gridArea = '1 / 1 / span 6 / span 12';
+      const tabs = h('div', 'bx-tabs');
+      const cardTitle = h('span', 'bx-title', t('browser.title'));
+      const panelBtn = h('button', 'bx-panel', t('browser.panel'));
+      panelBtn.addEventListener('click', () => { haptic(); goPage(homeIndex(), true); });
+      const head = h('div', 'bx-head', cardTitle, tabs, h('span', 'bx-grow'), panelBtn);
+      const body = h('div', 'bx-body');
+      const bodyUrl = h('div', 'bx-url', sites[sel].url);
+      body.append(bodyUrl);
+      sites.forEach((site, i) => {
+        const tab = h('button', 'bx-tab' + (i === sel ? ' on' : ''), site.name);
+        tab.title = site.url;
+        tab.addEventListener('click', () => {
+          if (i === sel) return;
+          haptic();
+          store.set('bx:' + (p.id || p.title), i);
+          const slot = webSlots.get(p.id || p.title);
+          if (slot) slot.index = i;
+          for (const other of tabs.children) other.classList.remove('on');
+          tab.classList.add('on');
+          bodyUrl.textContent = site.url;
+          queueWebPage();
+        });
+        tabs.appendChild(tab);
+      });
+      card.append(head, body);
+      grid.appendChild(card);
+      webSlots.set(p.id || p.title, { body, sites, index: sel });
+    } else {
+      webSlots.delete(p.id || p.title);
+    }
     for (const w of list) {
       const def = W[w.type];
       if (!def) continue;
@@ -1934,26 +1993,40 @@ export function onScroll() {
   queueWebPage();
 }
 pager.addEventListener('scroll', onScroll, { passive: true });
+// the site is bound to its card: while the pages move, move it with them
+pager.addEventListener('scroll', () => { if (webSlots.size) queueWebPage(); }, { passive: true });
 
-// ---- pages of kind "web": the app draws the website full-screen in its own WebView above the panel
-// (MainActivity.webPage). The panel only says which address is showing.
-let webShown = '', webTimer = 0;
-function queueWebPage() {
-  clearTimeout(webTimer);
-  webTimer = setTimeout(syncWebPage, 140); // after the swipe settles, so the page is not covered mid-slide
+// ---- pages of kind "web": the app draws the chosen site in its own WebView over the card's site area
+// (MainActivity.webPage). The panel only says where that area is and which address goes in it.
+let webShown = '', webRaf = 0;
+function hideWeb() {
+  if (!webShown) return;
+  webShown = '';
+  try { bridge && bridge.webPage('hide', '', 0, 0, 0, 0); } catch (_) {}
 }
+/** The app's view follows the card: on every scroll frame, so the site stays inside its frame while the pages move. */
 export function syncWebPage() {
   if (!bridge || !bridge.webPage) return;
-  const url = webUrlOf(pages[curPage]);
-  if (url === webShown) return;
-  webShown = url;
-  try { url ? bridge.webPage('show', url) : bridge.webPage('hide', ''); } catch (_) {}
+  const p = pages[curPage];
+  const slot = p && webSlots.get(p.id || p.title);
+  if (!slot) { hideWeb(); return; }
+  const site = slot.sites[slot.index] || slot.sites[0];
+  const r = slot.body.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  if (r.right <= 0 || r.left >= window.innerWidth) { hideWeb(); return; } // the card slid away
+  const key = [site.url, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)].join('|');
+  if (key === webShown) return;
+  webShown = key;
+  try { bridge.webPage('show', site.url, r.left, r.top, r.width, r.height); } catch (_) {}
 }
-// The app hid the browser view (Back with no page to go back to): return to the home page as usual.
+function queueWebPage() {
+  if (webRaf) return;
+  webRaf = requestAnimationFrame(() => { webRaf = 0; syncWebPage(); });
+}
+// A rotation or a resize moves the card: tell the app the new area.
+window.addEventListener('resize', () => { webShown = ''; queueWebPage(); });
+// The app hid the browser view (Back at the first page, or its Panel pill): return to the home page.
 window.onAndroidWebClosed = () => { webShown = ''; goPage(homeIndex(), true); };
-// The app's translucent pills over a full-screen site: previous / next page.
-window.pbPrevPage = () => goPage(curPage - 1, true);
-window.pbNextPage = () => goPage(curPage + 1, true);
 
 export function openOverview() {
   haptic();
