@@ -5,6 +5,9 @@
 **Widgets**
 - AI sessions: the open conversation of a Claude Code session follows new messages while it is read to the end; one
   scrolled back to an earlier message stays there (#460, [MisteryLiuCode](https://github.com/MisteryLiuCode)).
+- Spotify queue: a track tapped in the widget plays inside the playlist or album that is playing, so the rest of it
+  follows as in the Spotify app. A track you queued by hand still plays on its own (#441,
+  [HugoDeLannoy5311](https://github.com/HugoDeLannoy5311)).
 
 **Setup**
 - macOS: each release also has a disk image, `PhoneBox-<version>-<rid>.dmg`, with PhoneBox.app (no window; the settings
