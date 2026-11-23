@@ -1951,6 +1951,9 @@ export function syncWebPage() {
 }
 // The app hid the browser view (Back with no page to go back to): return to the home page as usual.
 window.onAndroidWebClosed = () => { webShown = ''; goPage(homeIndex(), true); };
+// The app's translucent pills over a full-screen site: previous / next page.
+window.pbPrevPage = () => goPage(curPage - 1, true);
+window.pbNextPage = () => goPage(curPage + 1, true);
 
 export function openOverview() {
   haptic();

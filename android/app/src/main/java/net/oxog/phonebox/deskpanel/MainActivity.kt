@@ -65,8 +65,8 @@ class MainActivity : Activity(), SensorEventListener {
     private lateinit var root: FrameLayout
     /** The full-screen browser view of a page of kind "web". Null until such a page is first shown. */
     private var pageWebView: WebView? = null
-    /** "Panel": leaves the browser view. Shown beside it, because the site covers the page dots. */
-    private var pageWebClose: android.widget.TextView? = null
+    /** Transparent controls over a full-screen site: the way out and the previous/next page pills. */
+    private var pageWebChrome: FrameLayout? = null
     /** A site's microphone request waiting for the Android permission dialog. */
     private var pendingWebMic: PermissionRequest? = null
     /** False when Android could not start its WebView (#385): the activity then only shows why. */
@@ -334,9 +334,16 @@ class MainActivity : Activity(), SensorEventListener {
      * The browser view of a page of kind "web" (PageConfig.Kind in the agent). It is a WebView of its own, laid over
      * the panel, with no JavaScript bridge attached: a site shown here can reach nothing of the phone.
      */
+    private fun dp(value: Float): Int = (resources.displayMetrics.density * value).toInt()
+
+    /**
+     * The browser view of a page of kind "web" (PageConfig.Kind in the agent). It is a WebView of its own, laid over
+     * the panel, with no JavaScript bridge attached: a site shown here can reach nothing of the phone. It fills the
+     * screen; the few controls it needs float over it as small translucent pills.
+     */
     private fun pageWeb(): WebView {
         pageWebView?.let { return it }
-        val view = WebView(this)
+        val view = SiteWebView(this)
         view.setBackgroundColor(0xFF000000.toInt())
         with(view.settings) {
             javaScriptEnabled = true
@@ -353,28 +360,77 @@ class MainActivity : Activity(), SensorEventListener {
         }
         // every link stays in this view: no separate browser opens on top of the panel
         view.webViewClient = WebViewClient()
-        // The panel's dots stay visible and tappable under the site, so another page can be picked without Back.
-        val bar = (resources.displayMetrics.density * PAGE_BAR_INSET_DP).toInt()
-        val lp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-        lp.bottomMargin = bar
-        root.addView(view, lp)
+        root.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         view.visibility = View.GONE
         pageWebView = view
 
-        val close = android.widget.TextView(this)
-        close.text = getString(R.string.web_back_to_panel)
-        close.textSize = 13f
-        close.setTextColor(0xFFFFFFFF.toInt())
-        close.gravity = Gravity.CENTER
-        close.setBackgroundColor(0x99000000.toInt())
-        close.setPadding(bar / 2, 0, bar / 2, 0)
-        close.setOnClickListener { closePageWeb() }
-        val clp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, bar, Gravity.TOP or Gravity.START)
-        clp.setMargins(bar / 3, bar / 3, 0, 0)
-        root.addView(close, clp)
-        close.visibility = View.GONE
-        pageWebClose = close
+        // Transparent chrome: nothing but these pills takes a touch, everything else belongs to the site.
+        val chrome = FrameLayout(this)
+        chrome.isClickable = false
+        chrome.isFocusable = false
+        root.addView(chrome, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        chrome.visibility = View.GONE
+        pageWebChrome = chrome
+
+        chrome.addView(pill(getString(R.string.web_back_to_panel)) { closePageWeb() },
+            FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34f), Gravity.TOP or Gravity.START)
+                .apply { setMargins(dp(10f), dp(10f), 0, 0) })
+        chrome.addView(pill("‹") { siteJs("window.pbPrevPage && window.pbPrevPage()") },
+            FrameLayout.LayoutParams(dp(44f), dp(44f), Gravity.BOTTOM or Gravity.START)
+                .apply { setMargins(dp(14f), 0, 0, dp(14f)) })
+        chrome.addView(pill("›") { siteJs("window.pbNextPage && window.pbNextPage()") },
+            FrameLayout.LayoutParams(dp(44f), dp(44f), Gravity.BOTTOM or Gravity.END)
+                .apply { setMargins(0, 0, dp(14f), dp(14f)) })
         return view
+    }
+
+    /** A small translucent control over the site. */
+    private fun pill(text: String, onClick: () -> Unit): android.widget.TextView = android.widget.TextView(this).apply {
+        setText(text)
+        textSize = 15f
+        setTextColor(0xE6FFFFFF.toInt())
+        gravity = Gravity.CENTER
+        setPadding(dp(12f), 0, dp(12f), 0)
+        background = android.graphics.drawable.GradientDrawable().apply {
+            cornerRadius = dp(17f).toFloat()
+            setColor(0x73000000)
+        }
+        setOnClickListener { onClick() }
+    }
+
+    /** Runs a script in the site's view (never in the panel). */
+    private fun siteJs(script: String) {
+        pageWebView?.let { if (!destroyed) it.evaluateJavascript(script, null) }
+    }
+
+    /**
+     * The site's WebView. A swipe that starts at the left or right edge switches to the previous or next panel page,
+     * so the page bar never has to cover the site; a swipe anywhere else is the site's own.
+     */
+    private inner class SiteWebView(context: android.content.Context) : WebView(context) {
+        private val edge = dp(26f)
+        private var downX = 0f
+        private var downY = 0f
+        private var fromEdge = false
+
+        override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    downX = event.x
+                    downY = event.y
+                    fromEdge = event.x < edge || event.x > width - edge
+                }
+                android.view.MotionEvent.ACTION_UP -> if (fromEdge &&
+                    kotlin.math.abs(event.x - downX) > dp(56f) &&
+                    kotlin.math.abs(event.y - downY) < dp(70f)) {
+                    fromEdge = false
+                    if (event.x > downX) siteJs("window.pbPrevPage && window.pbPrevPage()")
+                    else siteJs("window.pbNextPage && window.pbNextPage()")
+                    return true
+                }
+            }
+            return super.onTouchEvent(event)
+        }
     }
 
     /** Shows the browser view for [url]; the panel asks for this when a page of kind "web" comes into view. */
@@ -385,7 +441,7 @@ class MainActivity : Activity(), SensorEventListener {
         if (view.url != url) view.loadUrl(url)
         if (view.visibility != View.VISIBLE) {
             view.visibility = View.VISIBLE
-            pageWebClose?.visibility = View.VISIBLE
+            pageWebChrome?.visibility = View.VISIBLE
             view.onResume()
         }
         view.requestFocus()
@@ -401,13 +457,14 @@ class MainActivity : Activity(), SensorEventListener {
         val view = pageWebView ?: return
         if (view.visibility != View.VISIBLE) return
         view.visibility = View.GONE
-        pageWebClose?.visibility = View.GONE
+        pageWebChrome?.visibility = View.GONE
         view.onPause()
         if (hasWeb) web.requestFocus()
     }
 
     /** Grants a site's microphone request; the Android permission is asked for the first time it needs it. */
     private fun grantWebMic(request: PermissionRequest) {
+        Log.i("PhoneBox", "site requests: " + request.resources.joinToString() + " from " + request.origin)
         if (PermissionRequest.RESOURCE_AUDIO_CAPTURE !in request.resources) { request.deny(); return }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
             checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
@@ -778,8 +835,6 @@ class MainActivity : Activity(), SensorEventListener {
     }
 
     companion object {
-        /** Height of the strip left free under a site, so the panel's page dots stay usable. */
-        private const val PAGE_BAR_INSET_DP = 56f
         private const val WEB_MIC_REQUEST = 7712
         private const val ASSET_HOST = "appassets.androidplatform.net"
         private val NO_STORE = mapOf("Cache-Control" to "no-store")
