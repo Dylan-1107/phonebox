@@ -76,6 +76,8 @@ public sealed partial class SessionMonitor(ILogger<SessionMonitor> log, ConfigSt
             var list = new List<AgentSession>();
             try { list.AddRange(ReadClaude(titles: ShareTitles)); } catch (Exception ex) { log.LogDebug("claude sessions: {Msg}", ex.Message); }
             try { list.AddRange(ReadCodex()); } catch (Exception ex) { log.LogDebug("codex sessions: {Msg}", ex.Message); }
+            // ZCode keeps its sessions in a SQLite database; read-only, and only when it has one.
+            try { list.AddRange(ReadZCode()); } catch (Exception ex) { log.LogDebug("zcode sessions: {Msg}", ex.Message); }
             // OpenCode sessions are off until Settings › General › "Show OpenCode sessions" is enabled; while off,
             // the service is not read at all — not even the every-2-seconds GET.
             if (config?.Get().OpenCode.Sessions == true)

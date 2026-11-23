@@ -16,4 +16,5 @@
     <string name="ok">OK</string>
     <!-- Shown instead of the panel when Android cannot start its WebView (#385). -->
     <string name="webview_failed">The panel can\'t run on this phone: Android could not start its WebView. Some Android 5 phones can\'t run the WebView versions PhoneBox needs.</string>
+    <string name="web_back_to_panel">Panel</string>
 </resources>

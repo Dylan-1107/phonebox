@@ -35,7 +35,9 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.Manifest
 import android.webkit.JavascriptInterface
+import android.webkit.PermissionRequest
 import android.webkit.ConsoleMessage
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -63,6 +65,10 @@ class MainActivity : Activity(), SensorEventListener {
     private lateinit var root: FrameLayout
     /** The full-screen browser view of a page of kind "web". Null until such a page is first shown. */
     private var pageWebView: WebView? = null
+    /** "Panel": leaves the browser view. Shown beside it, because the site covers the page dots. */
+    private var pageWebClose: android.widget.TextView? = null
+    /** A site's microphone request waiting for the Android permission dialog. */
+    private var pendingWebMic: PermissionRequest? = null
     /** False when Android could not start its WebView (#385): the activity then only shows why. */
     private val hasWeb get() = ::web.isInitialized
     private val panelLanguageTag = Regex("auto|[a-z]{2}(-[A-Za-z]{2,4})?")
@@ -341,12 +347,33 @@ class MainActivity : Activity(), SensorEventListener {
         }
         view.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(message: ConsoleMessage): Boolean = true
+
+            // A site may ask for the microphone (voice chat); camera and screen capture are not granted here.
+            override fun onPermissionRequest(request: PermissionRequest) = grantWebMic(request)
         }
         // every link stays in this view: no separate browser opens on top of the panel
         view.webViewClient = WebViewClient()
-        root.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // The panel's dots stay visible and tappable under the site, so another page can be picked without Back.
+        val bar = (resources.displayMetrics.density * PAGE_BAR_INSET_DP).toInt()
+        val lp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        lp.bottomMargin = bar
+        root.addView(view, lp)
         view.visibility = View.GONE
         pageWebView = view
+
+        val close = android.widget.TextView(this)
+        close.text = getString(R.string.web_back_to_panel)
+        close.textSize = 13f
+        close.setTextColor(0xFFFFFFFF.toInt())
+        close.gravity = Gravity.CENTER
+        close.setBackgroundColor(0x99000000.toInt())
+        close.setPadding(bar / 2, 0, bar / 2, 0)
+        close.setOnClickListener { closePageWeb() }
+        val clp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, bar, Gravity.TOP or Gravity.START)
+        clp.setMargins(bar / 3, bar / 3, 0, 0)
+        root.addView(close, clp)
+        close.visibility = View.GONE
+        pageWebClose = close
         return view
     }
 
@@ -358,17 +385,38 @@ class MainActivity : Activity(), SensorEventListener {
         if (view.url != url) view.loadUrl(url)
         if (view.visibility != View.VISIBLE) {
             view.visibility = View.VISIBLE
+            pageWebClose?.visibility = View.VISIBLE
             view.onResume()
         }
         view.requestFocus()
+    }
+
+    /** Leaves the browser view and asks the panel to return to its home page. */
+    private fun closePageWeb() {
+        hidePageWeb()
+        if (hasWeb) web.evaluateJavascript("window.onAndroidWebClosed && window.onAndroidWebClosed()", null)
     }
 
     private fun hidePageWeb() {
         val view = pageWebView ?: return
         if (view.visibility != View.VISIBLE) return
         view.visibility = View.GONE
+        pageWebClose?.visibility = View.GONE
         view.onPause()
         if (hasWeb) web.requestFocus()
+    }
+
+    /** Grants a site's microphone request; the Android permission is asked for the first time it needs it. */
+    private fun grantWebMic(request: PermissionRequest) {
+        if (PermissionRequest.RESOURCE_AUDIO_CAPTURE !in request.resources) { request.deny(); return }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+            return
+        }
+        pendingWebMic?.deny()
+        pendingWebMic = request
+        requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), WEB_MIC_REQUEST)
     }
 
     @Deprecated("Deprecated in Java")
@@ -403,6 +451,11 @@ class MainActivity : Activity(), SensorEventListener {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == Dictation.PERMISSION_REQUEST)
             dictation.onPermission(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
+        if (requestCode == WEB_MIC_REQUEST) {
+            val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+            pendingWebMic?.let { if (granted) it.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) else it.deny() }
+            pendingWebMic = null
+        }
     }
 
     override fun onPause() {
@@ -725,6 +778,9 @@ class MainActivity : Activity(), SensorEventListener {
     }
 
     companion object {
+        /** Height of the strip left free under a site, so the panel's page dots stay usable. */
+        private const val PAGE_BAR_INSET_DP = 56f
+        private const val WEB_MIC_REQUEST = 7712
         private const val ASSET_HOST = "appassets.androidplatform.net"
         private val NO_STORE = mapOf("Cache-Control" to "no-store")
         private const val PANEL_HEADER = "X-PhoneBox-Panel"
