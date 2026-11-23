@@ -1457,6 +1457,11 @@ const siteIndexOf = (p, sites) => {
 
 /** The card of each "web" page on screen: its site area is where the app draws the browser view. */
 const webSlots = new Map();
+/** Whenever a site area changes size (page bar, sheet, config reload), re-place the app's view. */
+const webResize = typeof ResizeObserver === 'function' ? new ResizeObserver(() => queueWebPage()) : null;
+// A slow tick too: a rect can also change without a resize event (fonts, a token reflow); one comparison a
+// second is free and keeps the view from ever sitting a few pixels over the header row.
+setInterval(() => { if (webSlots.size) syncWebPage(); }, 1000);
 
 export function buildLayout() {
   const enabled = (cfg.pages || []).filter((p) => p.enabled !== false && (webUrlOf(p) || Array.isArray(p.widgets)));
@@ -1474,6 +1479,7 @@ export function buildLayout() {
   mounted = [];
   closeSheet();
   pager.replaceChildren();
+  webResize?.disconnect();
   pages.forEach((p, pi) => {
     const grid = h('div', 'grid');
     const pageAppearance = PhoneBoxAppearance.resolve(cfg.display?.appearance, p.appearance);
@@ -1500,10 +1506,12 @@ export function buildLayout() {
         const tab = h('button', 'bx-tab' + (i === sel ? ' on' : ''), site.name);
         tab.title = site.url;
         tab.addEventListener('click', () => {
-          if (i === sel) return;
+          const slot = webSlots.get(p.id || p.title);
+          // compare with what is showing now, not with the page as it was built: otherwise the tab you came
+          // from stays "already selected" and stops responding
+          if (slot ? slot.index === i : sel === i) return;
           haptic();
           store.set('bx:' + (p.id || p.title), i);
-          const slot = webSlots.get(p.id || p.title);
           if (slot) slot.index = i;
           for (const other of tabs.children) other.classList.remove('on');
           tab.classList.add('on');
@@ -1515,6 +1523,7 @@ export function buildLayout() {
       card.append(head, body);
       grid.appendChild(card);
       webSlots.set(p.id || p.title, { body, sites, index: sel });
+      webResize?.observe(body);
     } else {
       webSlots.delete(p.id || p.title);
     }
@@ -1543,6 +1552,7 @@ export function buildLayout() {
     pausedPageId = null;
   }
   buildDots();
+  queueWebPage();
   curPage = -1;
   goPage(idx, true);
   requestAnimationFrame(() => setActive(true));

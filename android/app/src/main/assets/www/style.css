@@ -1559,16 +1559,19 @@ body.controls-top .ap-foot { order: -1; margin-bottom: 4px; }
 /* One card like the rest (the grid gives the same margins), a line of tabs for the fixed sites, and the site area
    below it: the app draws the site itself in a WebView over that area (MainActivity.pageWeb). */
 .w-browser { display: flex; flex-direction: column; overflow: hidden; }
-.bx-head { flex: 0 0 42px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--line); min-width: 0; }
+.bx-head { flex: 0 0 42px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--line); min-width: 0;
+  touch-action: pan-y; /* a tab tap must not be taken for a page swipe */
+}
 .bx-title { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: var(--muted); white-space: nowrap; }
 .bx-grow { flex: 1; }
-.bx-panel { flex: 0 0 auto; padding: 5px 12px; border-radius: 11px; border: 1px solid rgba(255, 255, 255, .14);
+.bx-panel { flex: 0 0 auto; touch-action: pan-y; padding: 5px 12px; border-radius: 11px; border: 1px solid rgba(255, 255, 255, .14);
   background: rgba(255, 255, 255, .07); color: var(--text); font: inherit; font-size: 12px; }
 .bx-panel:active { background: rgba(255, 255, 255, .16); }
 .bx-tabs { display: flex; align-items: center; gap: 6px; overflow-x: auto; min-width: 0; scrollbar-width: none; }
 .bx-tabs::-webkit-scrollbar { display: none; }
 .bx-tab { flex: 0 0 auto; padding: 5px 12px; border-radius: 11px; border: 1px solid rgba(255, 255, 255, .10);
-  background: rgba(255, 255, 255, .04); color: var(--muted); font: inherit; font-size: 12px; white-space: nowrap; }
+  background: rgba(255, 255, 255, .04); color: var(--muted); font: inherit; font-size: 12px; white-space: nowrap;
+  touch-action: pan-y; -webkit-tap-highlight-color: transparent; }
 .bx-tab.on { color: var(--text); background: rgba(255, 255, 255, .13); border-color: rgba(255, 255, 255, .22); font-weight: 600; }
 .bx-body { flex: 1; min-height: 0; margin: 0 6px 6px; border-radius: 14px; overflow: hidden;
   background: rgba(0, 0, 0, .35); display: grid; place-items: center; }
