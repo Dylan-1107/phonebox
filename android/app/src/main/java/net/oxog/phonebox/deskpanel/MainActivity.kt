@@ -84,8 +84,13 @@ class MainActivity : Activity(), SensorEventListener {
     private val assetLoader by lazy {
         WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            // Icon PNGs for the All apps (this phone) widget: written on demand by PhoneApps, then plain files.
+            .addPathHandler("/phoneicons/", PhoneApps.IconHandler(PhoneApps.iconDir(this)))
             .build()
     }
+
+    /** The tablet's own apps: the list and the launch behind the All apps (this phone) widget. */
+    private val phoneApps by lazy { PhoneApps(this) }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -621,6 +626,17 @@ class MainActivity : Activity(), SensorEventListener {
 
         @JavascriptInterface
         fun cancelListening(key: String, id: Int) { if (ok(key) && id > 0) dictation.cancel(id) }
+
+        /**
+         * The apps installed on this phone (not the computer), as [{"id": package, "name": label}], by name.
+         * Their icons are at https://appassets.androidplatform.net/phoneicons/<package>.png (see assetLoader).
+         */
+        @JavascriptInterface
+        fun phoneApps(key: String): String = if (ok(key)) phoneApps.list().toString() else "[]"
+
+        /** Opens one of those apps by its package name. False when nothing was opened. */
+        @JavascriptInterface
+        fun launchApp(key: String, pkg: String): Boolean = ok(key) && phoneApps.launch(pkg)
     }
 
     companion object {
