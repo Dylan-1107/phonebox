@@ -21,7 +21,7 @@ public static class Lan
         if (File.Exists(certPath))
         {
             AppPaths.RestrictToOwner(certPath);
-            try { return X509CertificateLoader.LoadPkcs12FromFile(certPath, null, X509KeyStorageFlags.UserKeySet | X509KeyStorageFlags.Exportable); }
+            try { return Load(certPath); }
             catch { /* corrupt: recreate below */ }
         }
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -33,7 +33,17 @@ public static class Lan
         Directory.CreateDirectory(dir);
         using (var dst = AppPaths.CreatePrivate(certPath)) dst.Write(cert.Export(X509ContentType.Pfx));
         // Re-import so Windows TLS (SChannel) gets a persisted key.
-        return X509CertificateLoader.LoadPkcs12FromFile(certPath, null, X509KeyStorageFlags.UserKeySet | X509KeyStorageFlags.Exportable);
+        return Load(certPath);
+    }
+
+    /// <summary>
+    /// Loads the PFX. Prefers a persisted user key (what SChannel wants), but some Windows builds deny
+    /// NCryptCreatePersistedKey (0x80090010 NTE_PERM), so fall back to an ephemeral key which TLS accepts too.
+    /// </summary>
+    static X509Certificate2 Load(string certPath)
+    {
+        try { return X509CertificateLoader.LoadPkcs12FromFile(certPath, null, X509KeyStorageFlags.UserKeySet | X509KeyStorageFlags.Exportable); }
+        catch (CryptographicException) { return X509CertificateLoader.LoadPkcs12FromFile(certPath, null, X509KeyStorageFlags.EphemeralKeySet | X509KeyStorageFlags.Exportable); }
     }
 
     public static string Fingerprint(X509Certificate2 cert) => Convert.ToHexString(SHA256.HashData(cert.RawData)).ToLowerInvariant();
