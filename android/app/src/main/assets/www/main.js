@@ -2012,7 +2012,7 @@ let webShown = '', webRaf = 0;
 function hideWeb() {
   if (!webShown) return;
   webShown = '';
-  try { bridge && bridge.webPage('hide', '', 0, 0, 0, 0); } catch (_) {}
+  try { bridge && bridge.webPage('hide', '', '', 0, 0, 0, 0); } catch (_) {}
 }
 /** The app's view follows the card: on every scroll frame, so the site stays inside its frame while the pages move. */
 export function syncWebPage() {
@@ -2027,7 +2027,7 @@ export function syncWebPage() {
   const key = [site.url, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)].join('|');
   if (key === webShown) return;
   webShown = key;
-  try { bridge.webPage('show', site.url, r.left, r.top, r.width, r.height); } catch (_) {}
+  try { bridge.webPage('show', site.url, p.id || p.title, r.left, r.top, r.width, r.height); } catch (_) {}
 }
 function queueWebPage() {
   if (webRaf) return;

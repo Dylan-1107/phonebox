@@ -63,10 +63,12 @@ class MainActivity : Activity(), SensorEventListener {
     private lateinit var web: WebView
     /** The container that holds the panel; a "web" page's browser view is added on top of it. */
     private lateinit var root: FrameLayout
-    /** The full-screen browser view of a page of kind "web". Null until such a page is first shown. */
+    /** The site currently showing (the view of one tab), shared with onResume/onPause. */
     private var pageWebView: WebView? = null
-    /** The configured address the browser view is showing (not the page the user navigated to inside it). */
-    private var siteUrl: String? = null
+    /** One WebView per site, kept alive: switching tabs must not reload a site that was already open. */
+    private val siteViews = LinkedHashMap<String, WebView>()
+    /** The key of the site that is showing now ("pageId|url"). */
+    private var activeSiteKey: String? = null
     /** A site's microphone request waiting for the Android permission dialog. */
     private var pendingWebMic: PermissionRequest? = null
     /** False when Android could not start its WebView (#385): the activity then only shows why. */
@@ -337,8 +339,7 @@ class MainActivity : Activity(), SensorEventListener {
      * site area of that page's card, with no JavaScript bridge attached - a site shown here can reach nothing of the
      * phone. The card and its tabs stay in the panel; only a small "Panel" pill floats over the site.
      */
-    private fun pageWeb(): WebView {
-        pageWebView?.let { return it }
+    private fun siteView(): WebView {
         val view = WebView(this)
         view.setBackgroundColor(0xFF0B0E12.toInt())
         with(view.settings) {
@@ -365,7 +366,23 @@ class MainActivity : Activity(), SensorEventListener {
         view.clipToOutline = true
         root.addView(view, FrameLayout.LayoutParams(0, 0))
         view.visibility = View.GONE
-        pageWebView = view
+        return view
+    }
+
+    /** The view of site [key], created on first use and kept for as long as the app runs. */
+    private fun siteViewFor(key: String): WebView {
+        siteViews[key]?.let { return it }
+        // keep a handful at most: each WebView holds a rendered page in memory
+        if (siteViews.size >= MAX_SITE_VIEWS) {
+            val victim = siteViews.entries.firstOrNull { it.key != activeSiteKey && it.value.visibility != View.VISIBLE }
+            if (victim != null) {
+                siteViews.remove(victim.key)
+                (victim.value.parent as? ViewGroup)?.removeView(victim.value)
+                victim.value.destroy()
+            }
+        }
+        val view = siteView()
+        siteViews[key] = view
         return view
     }
 
@@ -386,30 +403,42 @@ class MainActivity : Activity(), SensorEventListener {
         view.layoutParams = lp
     }
 
-    /** Shows [url] in the site area the panel measured for it. */
-    private fun showPageWeb(url: String, x: Float, y: Float, w: Float, h: Float) {
+    /**
+     * Shows site [url] of page [pageKey] in the area the panel measured. Every site keeps its own WebView, so
+     * switching tabs goes back to the page exactly as it was left (scroll position, forms, the page navigated to).
+     */
+    private fun showPageWeb(pageKey: String, url: String, x: Float, y: Float, w: Float, h: Float) {
         // only http(s) addresses: the agent validates the same thing, but the panel is a page as well
         if (!(url.startsWith("https://") || url.startsWith("http://"))) return
         if (!(w.isFinite() && h.isFinite() && w > 0 && h > 0)) return
-        val view = pageWeb()
+        val key = pageKey + "|" + url
+        val view = siteViewFor(key)
+        if (view.url == null) view.loadUrl(url)
         placeAt(view, x, y, w, h)
-        // load only when the chosen site changes: pages the user opened inside a site are kept while it stays
-        if (siteUrl != url) {
-            siteUrl = url
-            view.loadUrl(url)
+        for ((otherKey, other) in siteViews) {
+            if (otherKey != key && other.visibility == View.VISIBLE) {
+                other.visibility = View.GONE
+                other.onPause()
+            }
         }
         if (view.visibility != View.VISIBLE) {
             view.visibility = View.VISIBLE
             view.onResume()
         }
+        activeSiteKey = key
+        pageWebView = view
     }
 
     private fun hidePageWeb() {
-        val view = pageWebView ?: return
-        if (view.visibility != View.VISIBLE) return
-        view.visibility = View.GONE
-        view.onPause()
-        if (hasWeb) web.requestFocus()
+        var hid = false
+        for (view in siteViews.values) {
+            if (view.visibility == View.VISIBLE) {
+                view.visibility = View.GONE
+                view.onPause()
+                hid = true
+            }
+        }
+        if (hid && hasWeb) web.requestFocus()
     }
 
     /** Grants a site's microphone request; the Android permission is asked for the first time it needs it. */
@@ -491,10 +520,11 @@ class MainActivity : Activity(), SensorEventListener {
             (web.parent as? ViewGroup)?.removeView(web) // a WebView must be detached before destroy()
             web.destroy()
         }
-        pageWebView?.let { view ->
+        for (view in siteViews.values) {
             (view.parent as? ViewGroup)?.removeView(view)
             view.destroy()
         }
+        siteViews.clear()
         pageWebView = null
         super.onDestroy()
     }
@@ -772,12 +802,12 @@ class MainActivity : Activity(), SensorEventListener {
          * its own WebView above the panel (see pageWeb), which has no bridge: it can reach nothing of the phone.
          */
         @JavascriptInterface
-        fun webPage(key: String, action: String, url: String, x: Double, y: Double, w: Double, h: Double) {
+        fun webPage(key: String, action: String, url: String, pageKey: String, x: Double, y: Double, w: Double, h: Double) {
             if (!ok(key)) return
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 when (action) {
-                    "show" -> showPageWeb(url.trim(), x.toFloat(), y.toFloat(), w.toFloat(), h.toFloat())
+                    "show" -> showPageWeb(pageKey, url.trim(), x.toFloat(), y.toFloat(), w.toFloat(), h.toFloat())
                     "hide" -> hidePageWeb()
                 }
             }
@@ -786,6 +816,8 @@ class MainActivity : Activity(), SensorEventListener {
 
     companion object {
         private const val WEB_MIC_REQUEST = 7712
+        /** Site WebViews kept at once; each one holds a rendered page. */
+        private const val MAX_SITE_VIEWS = 6
         private const val ASSET_HOST = "appassets.androidplatform.net"
         private val NO_STORE = mapOf("Cache-Control" to "no-store")
         private const val PANEL_HEADER = "X-PhoneBox-Panel"
