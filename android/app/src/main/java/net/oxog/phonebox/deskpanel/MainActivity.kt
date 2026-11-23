@@ -326,7 +326,10 @@ class MainActivity : Activity(), SensorEventListener {
             KeyEvent.KEYCODE_VOLUME_DOWN -> "next"
             else -> null
         }
-        if (key == null || !volumeKeysFlipPages || !hasWeb) return super.dispatchKeyEvent(event)
+        // A site may play or record audio: while one is showing, its volume keys belong to the system (and the
+        // shade), never to page switching.
+        val siteShowing = pageWebView?.visibility == View.VISIBLE
+        if (key == null || !volumeKeysFlipPages || !hasWeb || siteShowing) return super.dispatchKeyEvent(event)
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0)
             web.evaluateJavascript("window.onAndroidKey && window.onAndroidKey('$key')", null)
         return true
@@ -438,7 +441,15 @@ class MainActivity : Activity(), SensorEventListener {
                 hid = true
             }
         }
-        if (hid && hasWeb) web.requestFocus()
+        if (hid) {
+            // WebRTC leaves the device in communication mode, where the media volume no longer applies; a site that
+            // was recording or on a call should not keep the tablet in call audio after it is put away.
+            try {
+                (getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager).mode = android.media.AudioManager.MODE_NORMAL
+            } catch (_: Exception) {
+            }
+            if (hasWeb) web.requestFocus()
+        }
     }
 
     /** Grants a site's microphone request; the Android permission is asked for the first time it needs it. */
