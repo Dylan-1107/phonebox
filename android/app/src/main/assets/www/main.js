@@ -57,7 +57,7 @@ export const $ = (id) => document.getElementById(id);
 // the panel's own frames receive (MainActivity.bridgeKey). This wrapper adds it.
 const BRIDGE = ['battery', 'buzz', 'haptic', 'is24Hour', 'pcs', 'selectPc', 'forgetPc', 'setBrightness', 'setHomeScreen', 'setOrientation',
   'setPinned', 'setVolumeKeys', 'setLanguage', 'transport', 'sensors', 'version', 'canListen', 'listen', 'stopListening', 'cancelListening', 'trackpad', 'canWake', 'wakePc',
-  'phoneApps', 'launchApp'];
+  'phoneApps', 'launchApp', 'webPage'];
 export const bridge = typeof Android === 'undefined' ? null : Object.fromEntries(BRIDGE.filter((m) => typeof Android[m] === 'function')
   .map((m) => [m, (...args) => Android[m](window.__phoneboxKey || '', ...args)]));
 // Live preview inside the agent's layout editor: the layout comes from the editor (unsaved), not from the agent.
@@ -1430,8 +1430,11 @@ export function portraitLayout(widgets) {
   return { pos, rows: Math.max(12, occ.length) };
 }
 
+/** A page of kind "web" needs an http(s) address; without one it is drawn as an ordinary (empty) page. */
+export const webUrlOf = (p) => (p && p.kind === 'web' && typeof p.url === 'string' && /^https?:\/\//i.test(p.url.trim()) ? p.url.trim() : '');
+
 export function buildLayout() {
-  const enabled = (cfg.pages || []).filter((p) => p.enabled !== false && Array.isArray(p.widgets));
+  const enabled = (cfg.pages || []).filter((p) => p.enabled !== false && (webUrlOf(p) || Array.isArray(p.widgets)));
   const next = enabled.length ? enabled : FALLBACK_PAGES;
   const portrait = isPortrait();
   const h12 = hour12();
@@ -1449,9 +1452,14 @@ export function buildLayout() {
   pages.forEach((p, pi) => {
     const grid = h('div', 'grid');
     const pageAppearance = PhoneBoxAppearance.resolve(cfg.display?.appearance, p.appearance);
-    const pl = portrait ? portraitLayout(p.widgets) : null;
+    const list = Array.isArray(p.widgets) ? p.widgets : [];
+    const pl = portrait ? portraitLayout(list) : null;
     if (pl) { grid.style.gridTemplateColumns = 'repeat(6, minmax(0, 1fr))'; grid.style.gridTemplateRows = `repeat(${pl.rows}, minmax(0, 1fr))`; }
-    for (const w of p.widgets) {
+    // The app draws the website in a WebView of its own over this page (MainActivity.pageWeb). This placeholder
+    // stays behind it, and is what a browser preview of the panel shows.
+    const webUrl = webUrlOf(p);
+    if (webUrl) grid.appendChild(h('div', 'webpage', h('div', 'webpage-url', `🌐 ${webUrl}`)));
+    for (const w of list) {
       const def = W[w.type];
       if (!def) continue;
       const box = h('div', `w w-${w.type}${def.bare ? ' bare' : ' card'}`);
@@ -1923,14 +1931,32 @@ export function onScroll() {
   setActive();
   if (sheet) closeSheet();
   if (pageOf('procs')) loadProcs();
+  queueWebPage();
 }
 pager.addEventListener('scroll', onScroll, { passive: true });
+
+// ---- pages of kind "web": the app draws the website full-screen in its own WebView above the panel
+// (MainActivity.webPage). The panel only says which address is showing.
+let webShown = '', webTimer = 0;
+function queueWebPage() {
+  clearTimeout(webTimer);
+  webTimer = setTimeout(syncWebPage, 140); // after the swipe settles, so the page is not covered mid-slide
+}
+export function syncWebPage() {
+  if (!bridge || !bridge.webPage) return;
+  const url = webUrlOf(pages[curPage]);
+  if (url === webShown) return;
+  webShown = url;
+  try { url ? bridge.webPage('show', url) : bridge.webPage('hide', ''); } catch (_) {}
+}
+// The app hid the browser view (Back with no page to go back to): return to the home page as usual.
+window.onAndroidWebClosed = () => { webShown = ''; goPage(homeIndex(), true); };
 
 export function openOverview() {
   haptic();
   const ov = $('overview');
   const tile = (p, i) => {
-    const map = h('div', 'ov-map', p.widgets.map((w) => {
+    const map = h('div', 'ov-map', (p.widgets || []).map((w) => {
       const b = h('span', null, emo(WIDGET_ICONS[w.type] || '◻'));
       b.style.gridArea = `${w.y + 1} / ${w.x + 1} / span ${w.h} / span ${w.w}`;
       return b;

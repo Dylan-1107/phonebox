@@ -34,6 +34,10 @@
 
   const STRINGS = {
     en: {
+      's.js.webPage': 'Web page (show a website instead of widgets)',
+      's.js.webPageHint': 'The phone opens this address full-screen in its own browser. Back goes back inside the site, and past its first page returns to the panel home page.',
+      's.js.webPageNoUrl': 'No address yet',
+      's.js.webAddress': 'Address (https://…)',
       'phoneapps.title': 'Apps',
       'phoneapps.search': 'Search apps',
       'phoneapps.noApps': 'No apps found',
@@ -8509,6 +8513,10 @@
       's.wh.payloadHintFull': 'Payload JSON có thể mang <code>value</code>, <code>title</code>, <code>sub</code>, <code>unit</code>, <code>icon</code>, <code>color</code>, <code>level</code> (ok / warn / error), <code>progress</code> (0&ndash;1 hoặc 0&ndash;100), <code>items</code> (một danh sách) và <code>ttl</code> (giây). Văn bản thuần hoặc một con số cũng dùng được. Thông báo nhận <code>title</code>, <code>text</code>, <code>level</code>, <code>vibrate</code>, <code>seconds</code>, <code>wake</code> (làm sáng màn hình ban đêm) và <code>page</code> (chuyển sang trang đó).',
     },
     zh: {
+      's.js.webPage': '网页（显示网站而不是小组件）',
+      's.js.webPageHint': '平板会用自己的浏览器全屏打开这个网址。按返回键先在网页里后退，退到第一页后再按返回，回到面板首页。',
+      's.js.webPageNoUrl': '还没有填网址',
+      's.js.webAddress': '网址（https://…）',
       'phoneapps.title': '应用',
       'phoneapps.search': '搜索应用',
       'phoneapps.noApps': '没有找到应用',

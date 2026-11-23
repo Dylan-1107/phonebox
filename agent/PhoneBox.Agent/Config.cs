@@ -73,6 +73,8 @@ public sealed class AgentConfig
         pages = PagesFor(deviceId).Select(p => new
         {
             p.Id, p.Title, p.Icon, p.Enabled, p.IdleSec, p.Appearance,
+            // a page of kind "web": the phone shows Url in a browser view of its own instead of a grid of widgets
+            p.Kind, p.Url,
             widgets = (p.Widgets ?? []).Select(w => new
             {
                 w.Id, w.Type, w.X, w.Y, w.W, w.H, w.Appearance,
@@ -310,6 +312,12 @@ public sealed class PageConfig
     public int? IdleSec { get; set; }
     /// <summary>Widgets on a 12 x 6 grid.</summary>
     public List<WidgetConfig>? Widgets { get; set; }
+
+    /// <summary>"web": the phone shows <see cref="Url"/> full-screen in its own browser view instead of a grid of
+    /// widgets. Null (or anything else): the usual grid.</summary>
+    public string? Kind { get; set; }
+    /// <summary>The address of a "web" page (http or https). Ignored by grid pages.</summary>
+    public string? Url { get; set; }
 
     /// <summary>Create the page from this template (templates.json) when it has no widgets yet.</summary>
     public string? Template { get; set; }
@@ -868,6 +876,15 @@ public sealed partial class ConfigStore(string path)
         {
             if (p is null) continue;
             p.Appearance?.Normalize();
+            // A "web" page shows a website in the phone's own browser view instead of widgets. Without a usable
+            // address it is an ordinary page again, so a half-finished entry never leaves an empty page behind.
+            p.Kind = string.Equals(p.Kind, "web", StringComparison.OrdinalIgnoreCase) ? "web" : null;
+            if (p.Kind == "web")
+            {
+                p.Url = NormalizeWebUrl(p.Url);
+                if (p.Url is null) p.Kind = null;
+                else p.Widgets = [];
+            }
             var tpl = Catalog.Template(p.Template ?? p.Type);
             if ((p.Widgets is null || p.Widgets.Count == 0) && tpl is not null)
             {
@@ -908,6 +925,16 @@ public sealed partial class ConfigStore(string path)
         }
         if (pages.Count > 0 && pages.All(p => !p.Enabled)) pages[0].Enabled = true;
         return pages;
+    }
+
+    /// <summary>An address a "web" page may open: absolute http or https, trimmed. Null when it is not one.</summary>
+    internal static string? NormalizeWebUrl(string? url)
+    {
+        var s = (url ?? "").Trim();
+        if (s.Length is 0 or > 2048) return null;
+        if (!Uri.TryCreate(s, UriKind.Absolute, out var uri)) return null;
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) return null;
+        return uri.ToString();
     }
 
     private static Dictionary<T, string> ReserveLayoutIds<T>(IEnumerable<T> items, Func<T, string> getId,

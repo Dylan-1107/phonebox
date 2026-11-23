@@ -94,6 +94,10 @@ public sealed class GitHubMonitor(ILogger<GitHubMonitor> log) : BackgroundServic
     internal static Task<string> Gh(string[] args, CancellationToken ct)
     {
         var psi = new ProcessStartInfo("gh");
+        // gh writes UTF-8; without this the agent decodes it with the Windows code page (GBK on a Chinese system)
+        // and every non-ASCII title comes back garbled.
+        psi.StandardOutputEncoding = System.Text.Encoding.UTF8;
+        psi.StandardErrorEncoding = System.Text.Encoding.UTF8;
         foreach (var a in args) psi.ArgumentList.Add(a);
         return RunGh(psi, ct);
     }

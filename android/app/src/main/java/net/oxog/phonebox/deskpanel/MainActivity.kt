@@ -32,6 +32,7 @@ import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
 import android.webkit.JavascriptInterface
@@ -58,6 +59,10 @@ import java.util.Locale
 class MainActivity : Activity(), SensorEventListener {
 
     private lateinit var web: WebView
+    /** The container that holds the panel; a "web" page's browser view is added on top of it. */
+    private lateinit var root: FrameLayout
+    /** The full-screen browser view of a page of kind "web". Null until such a page is first shown. */
+    private var pageWebView: WebView? = null
     /** False when Android could not start its WebView (#385): the activity then only shows why. */
     private val hasWeb get() = ::web.isInitialized
     private val panelLanguageTag = Regex("auto|[a-z]{2}(-[A-Za-z]{2,4})?")
@@ -117,7 +122,9 @@ class MainActivity : Activity(), SensorEventListener {
             return
         }
         web.setBackgroundColor(0xFF000000.toInt())
-        setContentView(web)
+        root = FrameLayout(this)
+        root.addView(web, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        setContentView(root)
 
         with(web.settings) {
             javaScriptEnabled = true
@@ -317,8 +324,63 @@ class MainActivity : Activity(), SensorEventListener {
         return true
     }
 
+    /**
+     * The browser view of a page of kind "web" (PageConfig.Kind in the agent). It is a WebView of its own, laid over
+     * the panel, with no JavaScript bridge attached: a site shown here can reach nothing of the phone.
+     */
+    private fun pageWeb(): WebView {
+        pageWebView?.let { return it }
+        val view = WebView(this)
+        view.setBackgroundColor(0xFF000000.toInt())
+        with(view.settings) {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            mediaPlaybackRequiresUserGesture = false
+            loadWithOverviewMode = true
+            useWideViewPort = true
+        }
+        view.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(message: ConsoleMessage): Boolean = true
+        }
+        // every link stays in this view: no separate browser opens on top of the panel
+        view.webViewClient = WebViewClient()
+        root.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        view.visibility = View.GONE
+        pageWebView = view
+        return view
+    }
+
+    /** Shows the browser view for [url]; the panel asks for this when a page of kind "web" comes into view. */
+    private fun showPageWeb(url: String) {
+        // only http(s) addresses: the agent validates the same thing, but the panel is a page as well
+        if (!(url.startsWith("https://") || url.startsWith("http://"))) return
+        val view = pageWeb()
+        if (view.url != url) view.loadUrl(url)
+        if (view.visibility != View.VISIBLE) {
+            view.visibility = View.VISIBLE
+            view.onResume()
+        }
+        view.requestFocus()
+    }
+
+    private fun hidePageWeb() {
+        val view = pageWebView ?: return
+        if (view.visibility != View.VISIBLE) return
+        view.visibility = View.GONE
+        view.onPause()
+        if (hasWeb) web.requestFocus()
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        // A website is showing: Back goes back in it, and past its first page returns to the panel's home page.
+        val site = pageWebView
+        if (site != null && site.visibility == View.VISIBLE) {
+            if (site.canGoBack()) { site.goBack(); return }
+            hidePageWeb()
+            if (hasWeb) web.evaluateJavascript("window.onAndroidWebClosed && window.onAndroidWebClosed()", null)
+            return
+        }
         // Kiosk behaviour: Back does not leave the app, it returns to the first page.
         if (!hasWeb) return super.onBackPressed() // nothing to return to without the panel
         web.evaluateJavascript("window.onAndroidBack && window.onAndroidBack()", null)
@@ -329,6 +391,7 @@ class MainActivity : Activity(), SensorEventListener {
         if (!hasWeb) return
         resumed = true
         web.onResume()
+        if (pageWebView?.visibility == View.VISIBLE) pageWebView?.onResume()
         web.evaluateJavascript("window.onAppPause && window.onAppPause(false)", null) // the panel catches up at once
         stream.start()
         hideSystemUi()
@@ -352,6 +415,7 @@ class MainActivity : Activity(), SensorEventListener {
             web.evaluateJavascript("window.onAppPause && window.onAppPause(true)", null)
             web.onPause()
         }
+        pageWebView?.onPause()
         super.onPause()
     }
 
@@ -367,6 +431,11 @@ class MainActivity : Activity(), SensorEventListener {
             (web.parent as? ViewGroup)?.removeView(web) // a WebView must be detached before destroy()
             web.destroy()
         }
+        pageWebView?.let { view ->
+            (view.parent as? ViewGroup)?.removeView(view)
+            view.destroy()
+        }
+        pageWebView = null
         super.onDestroy()
     }
 
@@ -637,6 +706,22 @@ class MainActivity : Activity(), SensorEventListener {
         /** Opens one of those apps by its package name. False when nothing was opened. */
         @JavascriptInterface
         fun launchApp(key: String, pkg: String): Boolean = ok(key) && phoneApps.launch(pkg)
+
+        /**
+         * A page of kind "web": "show" with its address, or "hide" once another page is showing. The site is drawn in
+         * its own WebView above the panel (see pageWeb), which has no bridge: it can reach nothing of the phone.
+         */
+        @JavascriptInterface
+        fun webPage(key: String, action: String, url: String) {
+            if (!ok(key)) return
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                when (action) {
+                    "show" -> showPageWeb(url.trim())
+                    "hide" -> hidePageWeb()
+                }
+            }
+        }
     }
 
     companion object {

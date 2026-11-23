@@ -1554,3 +1554,9 @@ body.controls-top .ap-foot { order: -1; margin-bottom: 4px; }
 .ly-note[hidden] { display: none; }
 .w-lyrics:not(.timed):not(.plain) .ly-note { margin: auto; }
 .ly-credit { position: absolute; right: 10px; top: 9px; font-size: 9px; letter-spacing: .1em; color: var(--dim); }
+
+/* ---------------------------------------------------------------- pages of kind "web" */
+/* The app draws the site in a browser view of its own on top of this page (MainActivity.pageWeb); this placeholder
+   stays behind it, and it is what a browser preview of the panel shows. */
+.webpage { grid-column: 1 / -1; grid-row: 1 / -1; display: grid; place-items: center; padding: 24px; text-align: center; }
+.webpage-url { max-width: 92%; font-size: 13px; line-height: 1.4; color: var(--muted); word-break: break-all; }
