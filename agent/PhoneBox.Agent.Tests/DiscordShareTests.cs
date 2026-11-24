@@ -563,9 +563,12 @@ public sealed class DiscordShareTests : IDisposable
             monitor.Share(true);
             await discord.State($$$"""{"active":true,"pid":{{{pid}}},"application":{}}""");
             await Until(() => monitor.Sharing == true);
-            Assert.Equal("Space Racers", (string?)Json(monitor.Share(false))["name"]);
+            Assert.Equal("Space Racers", (string?)Json(monitor.Share(true))["name"]);
+            // the name goes with the share view only (PRIVACY.md): a state-only answer says just that you share
+            Assert.Null(Json(monitor.Share(false))["name"]);
+            Assert.True((bool?)Json(monitor.Share(false))["active"]);
             await discord.State("""{"active":true,"pid":999,"application":{}}"""); // changed to a process that isn't listed
-            await Until(() => Json(monitor.Share(false))["name"] is null);
+            await Until(() => Json(monitor.Share(true))["name"] is null);
         });
     }
 

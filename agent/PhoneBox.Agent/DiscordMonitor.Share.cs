@@ -187,7 +187,10 @@ public sealed partial class DiscordMonitor
             if (!ShareOn || !_snap.Connected) return new { enabled = true, ready = false, refused = _shareRefused, error = _snap.Error };
             if (list is not null) { _shareApps = list; _shareAppsAt = Environment.TickCount64; }
             if (_sharing == true && _shareName is null) _sharePicked = _shareApps.FirstOrDefault(a => a.Pid == _sharePid)?.Name ?? _sharePicked;
-            return new { enabled = true, ready = true, inCall = s.ChannelId is not null, active = _sharing, name = _shareName ?? _sharePicked, apps = apps ? _shareApps.ToList() : null };
+            return new { enabled = true, ready = true, inCall = s.ChannelId is not null, active = _sharing,
+                // the name of what is shared goes with the share view only, like the app list (PRIVACY.md); a state-only
+                // answer (the Live badge during a call) says only whether you share
+                name = apps ? _shareName ?? _sharePicked : null, apps = apps ? _shareApps.ToList() : null };
         }
     }
 
