@@ -1436,7 +1436,7 @@ export function handleEvent(e) {
   else if (e.kind === 'reload') location.reload();
 }
 
-export const WIDGET_ICONS = { camera: '📹', dictate: '🎙️', spectrum: '📶', 'app-console': '🎛️', discord: '💬', steam: '👥', 'steam-activity': '🔔', rules: '⚡', chargecare: '🔋', nextup: '⏭️', moon: '🌙', wordclock: '🔤', clock: '🕒', weather: '⛅', forecast: '🌦️', media: '🎵', lyrics: '🎤', stat: '📈', gauge: '⏲️', chart: '📊', meters: '💾', gpu: '🎮', quotas: '✳️', sessions: '🤖',
+export const WIDGET_ICONS = { camera: '📹', dictate: '🎙️', spectrum: '📶', 'app-console': '🎛️', discord: '💬', 'discord-bar': '🔊', steam: '👥', 'steam-activity': '🔔', rules: '⚡', chargecare: '🔋', nextup: '⏭️', moon: '🌙', wordclock: '🔤', clock: '🕒', weather: '⛅', forecast: '🌦️', media: '🎵', lyrics: '🎤', stat: '📈', gauge: '⏲️', chart: '📊', meters: '💾', gpu: '🎮', quotas: '✳️', sessions: '🤖',
   github: '🐙', processes: '⚙️', shortcuts: '🎛️', button: '🔘', worldclock: '🌍', calendar: '📅', pomodoro: '🍅', countdown: '⏳', note: '📝', command: '💻',
   push: '📡', inbox: '📬', label: '🔤', analog: '🕰️', progress: '📆', stopwatch: '⏱️', timer: '⏲️', counter: '🔢', breathe: '🫁', quote: '💬',
   checklist: '✅', battery: '🔋', topprocs: '🔥', quotaring: '🎯', volume: '🔊', sun: '🌅', air: '🍃', hackernews: '📰', feeds: '🗞️', photos: '🖼️', exchange: '💱', crypto: '🪙', image: '🖼️', pcswitch: '🖥️', pagebuttons: '🧭', 'plex-queue': '🎛️', 'plex-playlists': '🎶' };
@@ -1586,7 +1586,7 @@ export function buildLayout() {
       const appearance = PhoneBoxAppearance.resolve(cfg.display?.appearance, p.appearance, w.appearance);
       box.style.gridArea = `${at.y + 1} / ${at.x + 1} / span ${at.h} / span ${at.w}`;
       grid.appendChild(box);
-      const ctx = { page: p, w, o: w.options || {}, box, appearance };
+      const ctx = { page: p, w, o: w.options || {}, box, appearance, at, reflow: () => reflowPage(pi) };
       let inst;
       try { inst = def.create(box, ctx) || {}; } catch (e) { box.replaceChildren(h('div', 'empty', `${w.type}: ${e.message}`)); inst = {}; }
       PhoneBoxAppearance.widget(box, appearance);
@@ -1753,6 +1753,35 @@ export function buildDots() {
   dots.replaceChildren(...pages.map(dot), pageAllBtn, pagePauseBtn);
   dots.hidden = false;
   syncPagePauseUi();
+}
+
+/** A widget that hides itself (box.hidden, like the Discord bar outside a voice channel) gives its cells away: the
+ *  widgets right below it whose columns lie within its own grow up into its rows; with none below, the ones right above
+ *  grow down. Shown again, all go back to their own cells (every call starts again from each widget's own place). */
+export function reflowPage(pi) {
+  const items = mounted.filter((m) => m.pi === pi);
+  const area = new Map(items.map((m) => [m, { ...m.ctx.at }]));
+  const shown = items.filter((m) => !m.ctx.box.hidden);
+  // A neighbour that grows can reach the next hidden widget (two hidden bars stacked above a widget), so the hidden
+  // widgets are tried again until none is left or none moves.
+  let left = items.filter((m) => m.ctx.box.hidden);
+  for (let moved = true; moved && left.length;) {
+    moved = false;
+    left = left.filter((gone) => {
+      const g = gone.ctx.at;
+      const inside = (a) => a.x >= g.x && a.x + a.w <= g.x + g.w;
+      const below = shown.filter((m) => inside(area.get(m)) && area.get(m).y === g.y + g.h);
+      const above = shown.filter((m) => inside(area.get(m)) && area.get(m).y + area.get(m).h === g.y);
+      for (const m of below.length ? below : above) {
+        const a = area.get(m);
+        if (below.length) a.y = g.y;
+        a.h += g.h;
+      }
+      if (below.length || above.length) { moved = true; return false; }
+      return true;
+    });
+  }
+  for (const m of items) { const a = area.get(m); m.ctx.box.style.gridArea = `${a.y + 1} / ${a.x + 1} / span ${a.h} / span ${a.w}`; }
 }
 
 export function updateDots() {
