@@ -74,6 +74,59 @@ body.ocean::before { display: none; }       /* the theme glow would muddy the pu
 body.ocean #ocean { display: block; }
 body.night #ocean, body.dimmed #ocean { display: none; }  /* also stops the animation (IntersectionObserver) */
 
+/* ---------- OLED card frames (Settings › Display › Card fill = none) ----------
+   The cards keep a thin frame and lose the translucent fill, so the animation stays full-screen
+   behind them and untouched water stays true #000. Active/pressed states keep their accent. */
+body[data-card-fill="none"] { --card: transparent; --card-hi: transparent; }
+body[data-card-fill="none"]::before { display: none; } /* no theme glow over the black */
+
+body[data-card-fill="none"] .card,
+body[data-card-fill="none"] .proc,
+body[data-card-fill="none"] .ov-pc:not(.on),
+body[data-card-fill="none"] .ov-tile:not(.on),
+body[data-card-fill="none"] .q-card,
+body[data-card-fill="none"] .w[data-widget-surface="flat"],
+body[data-card-fill="none"] .deck-channel,
+body[data-card-fill="none"] .deck-trackpad,
+body[data-card-fill="none"] .deck-trackpad-bar,
+body[data-card-fill="none"] .radio-nav,
+body[data-card-fill="none"] .radio-eq,
+body[data-card-fill="none"] .sq-now,
+body[data-card-fill="none"] #dots.pagebar,
+body[data-card-fill="none"] #ptitle,
+body[data-card-fill="none"] #navChip,
+body[data-card-fill="none"] .toast,
+body[data-card-fill="none"] .ap-search {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+body[data-card-fill="none"] .card,
+body[data-card-fill="none"] .proc,
+body[data-card-fill="none"] .ov-pc:not(.on),
+body[data-card-fill="none"] .ov-tile:not(.on),
+body[data-card-fill="none"] .q-card,
+body[data-card-fill="none"] .deck-channel,
+body[data-card-fill="none"] .deck-trackpad,
+body[data-card-fill="none"] .radio-card:not(.is-playing),
+body[data-card-fill="none"] .radio-carousel .radio-card:not(.is-playing) {
+  border-color: var(--line);
+}
+
+body[data-card-fill="none"] .deck-button:not(:active):not(.selected):not([aria-pressed="true"]),
+body[data-card-fill="none"] .deck-hold:not(.held),
+body[data-card-fill="none"] .radio-card:not(.is-playing),
+body[data-card-fill="none"] .ap-tile:not(:active):not(.armed) {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+body[data-card-fill="none"] #overview { background: #000; }
+
 button { font: inherit; color: inherit; background: none; border: 0; }
 .muted { color: var(--muted); }
 .empty { width: 100%; height: 100%; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; white-space: pre-line; padding: 8px; }

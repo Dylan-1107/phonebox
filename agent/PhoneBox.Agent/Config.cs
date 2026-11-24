@@ -207,6 +207,12 @@ public sealed class DisplayConfig
     public List<string> KoiColours { get; set; } = [];
     /// <summary>How many jellyfish drift in the jellyfish scene, 1–8.</summary>
     public int JellyCount { get; set; } = 4;
+    /// <summary>none (transparent cards, OLED frames) or theme (the theme's translucent card fill).</summary>
+    public string CardFill { get; set; } = "none";
+    /// <summary>Colour of the thin card frame, "#rrggbb".</summary>
+    public string FrameColor { get; set; } = "#9aa3ad";
+    /// <summary>Frame opacity, 0–100 %.</summary>
+    public int FrameOpacity { get; set; } = 28;
     /// <summary>Which sharks the ocean shows, in order: a species and a skin colour each. Edited row by row
     /// in Settings › Display; a missing colour keeps the species tint.</summary>
     public List<OceanSharkConfig> OceanSharks { get; set; } = [];
@@ -748,6 +754,11 @@ public sealed partial class ConfigStore(string path)
         c.Display.KoiColourMode = c.Display.KoiColourMode is "custom" ? "custom" : "preset";
         c.Display.KoiColours = NormalizeKoiColours(c.Display.KoiColours);
         c.Display.JellyCount = Math.Clamp(c.Display.JellyCount, 1, 8);
+        c.Display.CardFill = c.Display.CardFill is "theme" ? "theme" : "none";
+        var frame = (c.Display.FrameColor ?? "").Trim().ToLowerInvariant();
+        c.Display.FrameColor = frame is { Length: 7 } && frame[0] == '#' && frame[1..].All(Uri.IsHexDigit)
+            ? frame : "#9aa3ad";
+        c.Display.FrameOpacity = Math.Clamp(c.Display.FrameOpacity, 0, 100);
         c.Display.OceanSharks = NormalizeOceanSharks(c.Display.OceanSharks);
         c.Display.OceanDetail = c.Display.OceanDetail is "balanced" or "battery" ? c.Display.OceanDetail : "high";
         c.Display.OceanFish = Math.Clamp(c.Display.OceanFish, 0, 400);

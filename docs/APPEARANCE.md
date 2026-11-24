@@ -74,18 +74,25 @@ unknown style or font names are discarded, and appearance does not accept arbitr
 ## Animated background
 
 Settings › Display › Background can replace the theme's flat colour and glow with an animated ASCII ocean
-(vendored [ascii-sharks](https://github.com/stackedlol/ascii-sharks), MIT). Cards, widget frames, spacing and
+(vendored [ascii-sharks](https://github.com/stackedlol/ascii-sharks), MIT). Card geometry, frames, spacing and
 the grid are untouched: the ocean is a fixed canvas layer underneath the pages, so it works with every layout.
+Card fill decides whether the inside of each card tints the animation or stays transparent.
 
 The stage is true black and draws no grid lines, so an OLED panel keeps those pixels off. The night screen and
 the idle-dim veil hide the canvas, which also pauses the animation through its IntersectionObserver; page
 switching, rules and the rest of the panel keep working over it. The canvas is rasterised at CSS pixels and kept
-opaque (the brightness is painted inside the canvas, not with CSS `opacity`), because it sits under the
-semi-transparent cards.
+opaque (the brightness is painted inside the canvas, not with CSS `opacity`).
+
+Cards default to **no fill** (`display.cardFill: "none"`): the animation keeps painting full-screen behind them,
+and a thin coloured frame keeps the areas apart. The frame colour and opacity are settings; the frame corner
+radius and spacing stay as before. Only the frame line and the widget content itself are lit — empty water and
+empty card areas stay #000. `display.cardFill: "theme"` restores the old translucent card fill.
 
 | Setting | Values | Default |
 |---|---|---|
 | Background | solid / sharks / koi / jellyfish | solid |
+| Card fill | none (OLED frames) / theme (translucent) | none |
+| Frame colour / opacity | any colour / 0–100 % | #9aa3ad / 28 % |
 | Sharks | a species and a colour per shark, 1–8 sharks | five muted defaults |
 | Koi | count 1–14; natural schemes or one colour per koi | 5, natural |
 | Jellyfish | count 1–8, the four species cycle | 4 |
@@ -115,3 +122,7 @@ lion's mane and crystal jellyfish cycle through `display.jellyCount` (1–8) in 
 are loaded only for the chosen background; Detail, FPS and Brightness apply to all three scenes. The koi pond
 does not use an IntersectionObserver of its own, so the panel pauses it explicitly with the night screen and
 the idle-dim veil.
+
+The `amoled` theme only changes colours; it does not make the cards black. True-black cards come from Card fill
+= none plus the frame settings. A 1px frame is still a lit pixel: set Frame opacity to 0 for a completely
+frameless black surface, at the cost of not seeing where one card ends and the next begins.

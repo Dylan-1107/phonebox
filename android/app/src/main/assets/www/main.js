@@ -2621,6 +2621,17 @@ export function applyDisplay() {
   document.documentElement.style.setProperty('--accent', `rgb(${DEFAULT_AMBIENT})`);
   artTint = d.artTint !== false;
   if (before !== DEFAULT_AMBIENT || !artTint) setAmbient(artTint ? currentArtColor : null);
+  // Cards: no fill, a thin configurable frame; the animation keeps painting full-screen behind them.
+  const cardFill = d.cardFill === 'theme' ? 'theme' : 'none';
+  document.body.dataset.cardFill = cardFill;
+  if (cardFill === 'none') {
+    const rgb = hexToRgb(d.frameColor) || '154, 163, 173';
+    const rawOpacity = d.frameOpacity == null ? 28 : Number(d.frameOpacity);
+    const op = Math.max(0, Math.min(100, Math.round(Number.isFinite(rawOpacity) ? rawOpacity : 28)));
+    document.documentElement.style.setProperty('--line', `rgba(${rgb}, ${(op / 100).toFixed(2)})`);
+  } else {
+    document.documentElement.style.removeProperty('--line');
+  }
   applyBackdrop(d);
   if (langChanged) { buildLayout(); renderApproval(); }
   renderRulesBtn();

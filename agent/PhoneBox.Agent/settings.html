@@ -713,6 +713,13 @@ nav a.on::before { color: var(--accent); }
         <div class="field" style="max-width:420px"><label data-i18n="s.display.background">Background</label>
           <select data-bind="display.background"><option value="solid" data-i18n="s.display.background.solid">Solid colour (theme)</option><option value="sharks" data-i18n="s.display.background.sharks">ASCII ocean (pure black)</option><option value="koi" data-i18n="s.display.background.koi">Koi pond (pure black)</option><option value="jellyfish" data-i18n="s.display.background.jellyfish">Jellyfish (pure black)</option></select>
           <span class="hint" data-i18n="s.display.backgroundHint">A live ASCII shark tank behind the widgets. Cards, pages and the grid stay exactly as they are.</span></div>
+        <div class="row" style="gap:16px;margin-bottom:6px;align-items:flex-end;flex-wrap:wrap">
+          <div class="field" style="margin:0"><label data-i18n="s.display.cardFill">Card fill</label>
+            <select data-bind="display.cardFill"><option value="none" data-i18n="s.display.cardFill.none">None (OLED)</option><option value="theme" data-i18n="s.display.cardFill.theme">Theme (translucent)</option></select></div>
+          <div class="field" style="margin:0"><label data-i18n="s.display.frameColor">Frame colour</label><input type="color" data-bind="display.frameColor" style="width:56px;height:36px;padding:2px"></div>
+          <div class="field" style="margin:0"><label><span data-i18n="s.display.frameOpacity">Frame opacity: </span><span id="fov"></span></label><input type="range" min="0" max="100" step="5" data-bind="display.frameOpacity" data-type="int"></div>
+        </div>
+        <span class="hint" style="display:block;margin:0 0 12px" data-i18n="s.display.cardFillHint">No fill inside the cards; a thin coloured line keeps the areas apart, and the animation stays full-screen behind them.</span>
         <div id="oceanOptions" hidden>
           <div class="field" style="max-width:560px"><label data-i18n="s.display.oceanSharks">Sharks</label>
             <div id="oceanSharkRows"></div>
@@ -3750,6 +3757,7 @@ function bindForm() {
       if (p === 'lan.enabled') renderLanStatus();
       if (p === 'display.background') renderOceanOptions();
       if (p === 'display.koiCount' || p === 'display.koiColourMode') renderKoiColours();
+      if (p === 'display.frameOpacity') $('fov').textContent = Math.round(parseInt(el.value || '28', 10)) + '%';
       if (p === 'display.oceanOpacity') $('oov').textContent = Math.round(parseInt(el.value || '70', 10)) + '%';
       if (p === 'photos.source' || p === 'photos.immichUrl' || p === 'photos.immichKey') renderPhotoSource();
       changed();
@@ -3767,6 +3775,7 @@ function bindForm() {
     changed();
   };
   $('nbv').textContent = Math.round(cfg.night.brightness * 100) + '%';
+  if ($('fov')) $('fov').textContent = Math.round(cfg.display.frameOpacity ?? 28) + '%';
 }
 
 function bindCodexBar() {
@@ -3878,7 +3887,7 @@ function fillDefaults() {
   cfg.codexBar ??= { providers: ['claude', 'codex', 'antigravity'], rotate: true, pageSize: 2, rotateInterval: 8 };
   for (const [k, v] of Object.entries({ language: 'auto', hour12: false, idleReturnSec: 90, switchCountdownSec: 3, touchGraceSec: 20, minDwellSec: 15, holdMaxMin: 30, keepAwake: true, openOnConnect: true,
     showSeconds: true, vibrate: true, finishToast: true, volumeKeys: true, artTint: true, nightWhenUnreachable: false, unreachableNightDelayMin: 5, proximityWake: true, orientation: 'landscape', theme: 'default', accent: '#2dd4bf',
-    background: 'solid', oceanDetail: 'high', oceanFish: 140, oceanFps: 24, oceanOpacity: 70, oceanStill: false })) cfg.display[k] ??= v;
+    background: 'solid', cardFill: 'none', frameColor: '#9aa3ad', frameOpacity: 28, oceanDetail: 'high', oceanFish: 140, oceanFps: 24, oceanOpacity: 70, oceanStill: false })) cfg.display[k] ??= v;
   // the five muted defaults; the real list comes back from the agent once it is saved
   cfg.display.oceanSharks ??= [
     { kind: 'whale', color: '#a9c7e8' }, { kind: 'greathammer', color: '#d9c8a6' },
