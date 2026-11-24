@@ -24,6 +24,10 @@ public sealed partial class DiscordMonitor
     internal const int ShareAppsMax = 30;
     /// <summary>Discord's builds on Windows: the process name and the folder under %LOCALAPPDATA% that holds its Update.exe.</summary>
     internal static readonly (string Process, string Folder)[] DiscordBuilds = [("Discord", "Discord"), ("DiscordPTB", "DiscordPTB"), ("DiscordCanary", "DiscordCanary")];
+
+    /// <summary>The builds to bring forward, the one the agent is connected to first (it opened the picker), then the others in order.</summary>
+    internal static IEnumerable<(string Process, string Folder)> BuildsFor(string? connected) =>
+        DiscordBuilds.OrderBy(b => string.Equals(b.Process, connected, StringComparison.OrdinalIgnoreCase) ? 0 : 1);
     /// <summary>How long a direct share may take to start before the phone is told to use the picker.</summary>
     internal TimeSpan ShareStartWait = TimeSpan.FromSeconds(4); // internal: tests wait less
     internal int ShareAppsCacheMs = 10_000; // internal: tests make it old
@@ -230,7 +234,7 @@ public sealed partial class DiscordMonitor
             if (action == "stop") lock (_lock) if (_sharing == true) _sharing = null;
             // Discord draws its picker inside its own window: bring that window up, or the picker opens unseen behind
             // other windows (or with Discord in the tray)
-            if (action == "pick") _ = Task.Run(ShowDiscord);
+            if (action == "pick") _ = Task.Run(ShowDiscordAsync);
             if (action != "app") return null;
             // Discord starts a direct share only for what it can capture that way (games it detects); for anything else it
             // quietly does nothing. Watch for the share to start rather than guessing beforehand.
@@ -241,12 +245,14 @@ public sealed partial class DiscordMonitor
         catch (Exception ex) { return new("failed", ex.Message); }
         finally { _shareAct.Release(); }
 
-        void ShowDiscord()
+        async Task ShowDiscordAsync()
         {
 #if WINDOWS
             try
             {
-                foreach (var (process, folder) in DiscordBuilds)
+                // the build this agent talks to first: that is where Discord opened the picker
+                var connected = _ipcProcess;
+                foreach (var (process, folder) in BuildsFor(connected))
                 {
                     var running = Process.GetProcessesByName(process);
                     var any = running.Length > 0;
@@ -260,10 +266,14 @@ public sealed partial class DiscordMonitor
                     var start = new ProcessStartInfo(update) { UseShellExecute = false, CreateNoWindow = true };
                     start.ArgumentList.Add("--processStart");
                     start.ArgumentList.Add(process + ".exe");
-                    // it hands over to the running Discord and exits at once; one that hangs is not left behind
+                    // It hands over to the running Discord and exits at once. One that hangs is ended after 15 s, or
+                    // when the agent stops, so it is never left behind.
                     using var updater = Process.Start(start);
-                    if (updater is not null && !updater.WaitForExit(TimeSpan.FromSeconds(15)))
-                        try { updater.Kill(); } catch { } // exited meanwhile
+                    if (updater is null) return;
+                    using var wait = CancellationTokenSource.CreateLinkedTokenSource(_life);
+                    wait.CancelAfter(TimeSpan.FromSeconds(15));
+                    try { await updater.WaitForExitAsync(wait.Token); }
+                    catch (OperationCanceledException) { try { updater.Kill(); } catch { } } // exited meanwhile
                     return;
                 }
             }

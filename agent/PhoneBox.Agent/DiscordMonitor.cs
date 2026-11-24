@@ -155,6 +155,7 @@ public sealed partial class DiscordMonitor(ConfigStore config, ILogger<DiscordMo
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+        _life = ct;
         string? lastError = null;
         (string? Id, string? Secret)? refusedFor = null;
         var failures = 0;
@@ -191,6 +192,7 @@ public sealed partial class DiscordMonitor(ConfigStore config, ILogger<DiscordMo
         if (string.IsNullOrWhiteSpace(cfg.ClientId) || string.IsNullOrWhiteSpace(cfg.ClientSecret))
             throw new Exception("Enter the application's client ID and secret (Settings › General › Discord)");
         await using var io = await OpenIpc(ct);
+        _ipcProcess = IpcProcess(io);
         // handshake
         await WriteFrame(io, 0, new JsonObject { ["v"] = 1, ["client_id"] = cfg.ClientId }, ct);
         var ready = (await ReadFrame(io, ct))?.Body ?? throw new IOException("Discord closed the connection");
@@ -784,6 +786,32 @@ public sealed partial class DiscordMonitor(ConfigStore config, ILogger<DiscordMo
             };
         }
     }
+
+    /// <summary>Stops with the agent: what the monitor starts on the side (the updater that shows Discord) ends with it.</summary>
+    private CancellationToken _life;
+    /// <summary>The process name of the Discord this agent talks to (Discord, DiscordPTB or DiscordCanary), when Windows says.</summary>
+    private volatile string? _ipcProcess;
+
+    /// <summary>Which process holds the other end of the pipe: the Discord build the requests go to. Windows only.</summary>
+    private static string? IpcProcess(Stream io)
+    {
+#if WINDOWS
+        try
+        {
+            if (io is NamedPipeClientStream pipe && GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var pid))
+            {
+                using var p = System.Diagnostics.Process.GetProcessById((int)pid);
+                return p.ProcessName;
+            }
+        }
+        catch { } // exited meanwhile, or not allowed: the builds are then tried in order
+#endif
+        return null;
+    }
+#if WINDOWS
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetNamedPipeServerProcessId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint processId);
+#endif
 
     // ---- IPC transport: 4-byte opcode + 4-byte length (little endian) + UTF-8 JSON ----
 
