@@ -33,6 +33,8 @@ CrossDesk 官方网页版使用 9 位 ID + 密码连接，握手依赖官方信�
 
 同页还有两个会造成困扰的开关：`lock_on_disconnect`（连接断开后锁屏，会在控制端断开时锁住被控电脑）和「被连接时开启隐私屏」（被控端显示器会看到隐私屏）。提前按需要调整。
 
+改完「仅允许可信设备控制」要重启 CrossDesk 再连。2026-11-24 实测：只在界面里关掉并保存后，新会话画面正常、`直连` 正常，但控制端鼠标键盘完全没反应（PC 光标不动、打字无字符）；被控端只记录一次 `Remote pointer input received`，之后没有任何输入结果日志。原因是 Windows 版 CrossDesk 由 GUI 加 `crossdesk_service` 组成，输入注入走服务端的受控端名单，服务仍按旧的可信设备策略丢弃了输入。完全退出并重新启动 CrossDesk 后，同一套网页客户端立刻恢复：远程滑动把光标从 (646,951) 移到 (1171,1066)，远程 Esc 关掉了电脑上的对话框。再次修改这个开关后同样要重启。
+
 **PhoneBox 的 WebView 设置**
 
 浏览器页使用独立 Android WebView，不是 iframe，不向外部站点附加 PhoneBox 的 Android JS bridge。
