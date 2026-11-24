@@ -711,24 +711,44 @@ nav a.on::before { color: var(--accent); }
           <label class="check" style="margin-bottom:8px"><input type="checkbox" data-bind="display.artTint"> <span data-i18n="s.display.artTint">Tint the background with the album art</span></label>
         </div>
         <div class="field" style="max-width:420px"><label data-i18n="s.display.background">Background</label>
-          <select data-bind="display.background"><option value="solid" data-i18n="s.display.background.solid">Solid colour (theme)</option><option value="sharks" data-i18n="s.display.background.sharks">ASCII ocean (pure black)</option></select>
+          <select data-bind="display.background"><option value="solid" data-i18n="s.display.background.solid">Solid colour (theme)</option><option value="sharks" data-i18n="s.display.background.sharks">ASCII ocean (pure black)</option><option value="koi" data-i18n="s.display.background.koi">Koi pond (pure black)</option><option value="jellyfish" data-i18n="s.display.background.jellyfish">Jellyfish (pure black)</option></select>
           <span class="hint" data-i18n="s.display.backgroundHint">A live ASCII shark tank behind the widgets. Cards, pages and the grid stay exactly as they are.</span></div>
         <div id="oceanOptions" hidden>
           <div class="field" style="max-width:560px"><label data-i18n="s.display.oceanSharks">Sharks</label>
             <div id="oceanSharkRows"></div>
             <button class="btn sm" type="button" id="oceanAddShark" data-i18n="s.display.oceanAddShark">Add a shark</button>
-            <span class="hint" data-i18n="s.display.oceanSharksHint">Pick a species and a colour for each shark. Colours are muted by default; the picker sets the skin tint, and Brightness dims the whole ocean.</span>
+            <span class="hint" data-i18n="s.display.oceanSharksHint">Pick a species and a colour for each shark. Colours are muted by default; the picker sets the skin tint, and Brightness dims the whole scene.</span>
           </div>
           <div class="row" style="gap:16px;margin-bottom:8px;align-items:flex-end;flex-wrap:wrap">
             <div class="field" style="margin:0"><label data-i18n="s.display.oceanFish">Fish</label><input type="number" min="0" max="400" data-bind="display.oceanFish" data-type="int" style="width:90px"></div>
+            <label class="check" style="margin-bottom:8px"><input type="checkbox" data-bind="display.oceanStill"> <span data-i18n="s.display.oceanStill">One still frame instead of animating (saves power)</span></label>
+          </div>
+          <span class="hint" style="display:block;margin-top:2px" data-i18n="s.display.oceanHint">Pure black with no grid, so the screen keeps its OLED black. The scene pauses with the night screen and while the panel is dimmed.</span>
+        </div>
+        <div id="koiOptions" hidden>
+          <div class="row" style="gap:16px;margin-bottom:8px;align-items:flex-end;flex-wrap:wrap">
+            <div class="field" style="margin:0"><label data-i18n="s.display.koiCount">Koi</label><input type="number" min="1" max="14" data-bind="display.koiCount" data-type="int" style="width:90px"></div>
+            <div class="field" style="margin:0"><label data-i18n="s.display.koiColourMode">Colours</label>
+              <select data-bind="display.koiColourMode"><option value="preset" data-i18n="s.display.koiColourMode.preset">Natural (official)</option><option value="custom" data-i18n="s.display.koiColourMode.custom">Custom, one per koi</option></select></div>
+          </div>
+          <div id="koiCustom" hidden>
+            <div id="koiColourRows"></div>
+            <span class="hint" data-i18n="s.display.koiColoursHint">One colour per koi, in swimming order.</span>
+          </div>
+          <span class="hint" style="display:block;margin-top:2px" data-i18n="s.display.koiHint">Black water on an OLED screen; the koi keep their fins, shadow and wake. Pauses with the night screen.</span>
+        </div>
+        <div id="jellyOptions" hidden>
+          <div class="field" style="margin:0;max-width:220px"><label data-i18n="s.display.jellyCount">Jellyfish</label><input type="number" min="1" max="8" data-bind="display.jellyCount" data-type="int" style="width:90px"></div>
+          <span class="hint" style="display:block;margin-top:2px" data-i18n="s.display.jellyHint">Moon, compass, lion's mane and crystal jellyfish cycle through the count, in their natural colours.</span>
+        </div>
+        <div id="backdropCommon" hidden>
+          <div class="row" style="gap:16px;margin-bottom:8px;align-items:flex-end;flex-wrap:wrap">
             <div class="field" style="margin:0"><label data-i18n="s.display.oceanDetail">Detail</label>
               <select data-bind="display.oceanDetail"><option value="high" data-i18n="s.display.oceanDetail.high">High (sharpest)</option><option value="balanced" data-i18n="s.display.oceanDetail.balanced">Balanced</option><option value="battery" data-i18n="s.display.oceanDetail.battery">Battery saver</option></select></div>
             <div class="field" style="margin:0"><label data-i18n="s.display.oceanFps">Frames per second</label>
               <select data-bind="display.oceanFps" data-type="int"><option value="24">24</option><option value="30">30</option><option value="45">45</option><option value="60">60</option></select></div>
             <div class="field" style="margin:0"><label><span data-i18n="s.display.oceanOpacity">Brightness: </span><span id="oov"></span></label><input type="range" min="20" max="100" step="5" data-bind="display.oceanOpacity" data-type="int"></div>
           </div>
-          <label class="check"><input type="checkbox" data-bind="display.oceanStill"> <span data-i18n="s.display.oceanStill">One still frame instead of animating (saves power)</span></label>
-          <span class="hint" style="display:block;margin-top:2px" data-i18n="s.display.oceanHint">Pure black with no grid, so the screen keeps its OLED black. The ocean pauses with the night screen and while the panel is dimmed.</span>
         </div>
         <div class="field" style="max-width:420px"><label data-i18n="s.display.orientation">Orientation</label>
           <select data-bind="display.orientation"><option value="landscape" data-i18n="s.display.orientation.landscape">Landscape</option><option value="portrait" data-i18n="s.display.orientation.portrait">Portrait</option><option value="auto" data-i18n="s.display.orientation.auto">Follow the phone</option></select>
@@ -3654,6 +3674,7 @@ function bindLanguage() {
 
 const OCEAN_SHARK_KINDS = ['classic', 'hammerhead', 'zebra', 'tiger', 'greathammer', 'mako', 'thresher', 'nurse', 'whale'];
 const OCEAN_SHARK_COLORS = ['#a9c7e8', '#d9c8a6', '#d8b0a6', '#a9cdb8', '#bdb2d8', '#c8c2a8', '#a8c8c8', '#c4b2c8'];
+const OCEAN_KOI_DEFAULTS = ['#e08a4a', '#d24b32', '#e0b44a', '#e88a88', '#c9c2b4', '#b06a4a', '#d9a066', '#cf7a6a', '#e6c07a', '#b9785a', '#e0a0a0', '#c9885a', '#d8b48a', '#b86850'];
 
 function renderOceanSharks() {
   const box = $('oceanSharkRows');
@@ -3674,11 +3695,36 @@ function renderOceanSharks() {
   if (add) add.disabled = list.length >= 8;
 }
 
+function renderKoiColours() {
+  const box = $('koiColourRows');
+  if (!box) return;
+  const d = cfg.display || {};
+  const custom = d.koiColourMode === 'custom';
+  const wrap = $('koiCustom');
+  if (wrap) wrap.hidden = !custom;
+  if (!custom) { box.replaceChildren(); return; }
+  const count = Math.max(1, Math.min(14, parseInt(d.koiCount || 5, 10)));
+  const list = Array.isArray(d.koiColours) ? d.koiColours : (d.koiColours = []);
+  box.replaceChildren(...Array.from({ length: count }, (_, i) => {
+    const color = /^#[0-9a-f]{6}$/i.test(list[i] || '') ? list[i] : OCEAN_KOI_DEFAULTS[i % OCEAN_KOI_DEFAULTS.length];
+    const input = h('input', { type: 'color', value: color,
+      style: { width: '56px', height: '34px', padding: '2px' },
+      oninput: (e) => { list[i] = e.target.value; changed(); } });
+    return h('div', { class: 'row', style: { gap: '8px', alignItems: 'center', margin: '0 0 6px' } },
+      h('span', { class: 'hint', style: { minWidth: '18px' } }, String(i + 1)), input);
+  }));
+}
+
 function renderOceanOptions() {
   const d = cfg.display || {};
-  $('oceanOptions').hidden = d.background !== 'sharks';
+  const bg = d.background || 'solid';
+  $('oceanOptions').hidden = bg !== 'sharks';
+  $('koiOptions').hidden = bg !== 'koi';
+  $('jellyOptions').hidden = bg !== 'jellyfish';
+  $('backdropCommon').hidden = !['sharks', 'koi', 'jellyfish'].includes(bg);
   $('oov').textContent = Math.round(d.oceanOpacity ?? 70) + '%';
   renderOceanSharks();
+  renderKoiColours();
 }
 
 function bindForm() {
@@ -3703,6 +3749,7 @@ function bindForm() {
       if (p === 'charge.method') renderCharge();
       if (p === 'lan.enabled') renderLanStatus();
       if (p === 'display.background') renderOceanOptions();
+      if (p === 'display.koiCount' || p === 'display.koiColourMode') renderKoiColours();
       if (p === 'display.oceanOpacity') $('oov').textContent = Math.round(parseInt(el.value || '70', 10)) + '%';
       if (p === 'photos.source' || p === 'photos.immichUrl' || p === 'photos.immichKey') renderPhotoSource();
       changed();
@@ -3838,6 +3885,10 @@ function fillDefaults() {
     { kind: 'tiger', color: '#d8b0a6' }, { kind: 'thresher', color: '#a9cdb8' },
     { kind: 'mako', color: '#bdb2d8' },
   ];
+  cfg.display.koiCount ??= 5;
+  cfg.display.koiColourMode ??= 'preset';
+  cfg.display.jellyCount ??= 4;
+  if (!Array.isArray(cfg.display.koiColours) || !cfg.display.koiColours.length) cfg.display.koiColours = [...OCEAN_KOI_DEFAULTS];
   cfg.charge ??= { enabled: false, min: 50, max: 80, method: 'ha' };
   cfg.steam ??= { enabled: false };
 }

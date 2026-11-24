@@ -71,7 +71,7 @@ Supported style values are `default`, `cards`, `flat`, `borderless` and `seamles
 Omitted/null properties inherit. Zero and false are explicit choices. Imported numeric values are bounded;
 unknown style or font names are discarded, and appearance does not accept arbitrary CSS.
 
-## Ocean background
+## Animated background
 
 Settings › Display › Background can replace the theme's flat colour and glow with an animated ASCII ocean
 (vendored [ascii-sharks](https://github.com/stackedlol/ascii-sharks), MIT). Cards, widget frames, spacing and
@@ -85,8 +85,10 @@ semi-transparent cards.
 
 | Setting | Values | Default |
 |---|---|---|
-| Background | solid / sharks | solid |
+| Background | solid / sharks / koi / jellyfish | solid |
 | Sharks | a species and a colour per shark, 1–8 sharks | five muted defaults |
+| Koi | count 1–14; natural schemes or one colour per koi | 5, natural |
+| Jellyfish | count 1–8, the four species cycle | 4 |
 | Detail | high (2x raster, 160 columns) / balanced / battery saver | high |
 | Fish | 0–400 | 140 |
 | Frames per second | 24–60 | 24 |
@@ -103,3 +105,13 @@ species' own tint. A picked colour is the shark's skin colour: body blocks, fins
 glyphs are all shades of that one colour, so it controls the whole animal instead of a lit patch. The defaults
 are deliberately muted pastels, and the Brightness slider dims the whole ocean. Fish are tinted per species
 (sardine, anchovy, silverside, mackerel, goby) so the school reads as colour over the black water.
+
+The koi pond is the vendored [ascii-koi](https://github.com/pursurer/ascii-koi) engine (MIT): black water with
+no caustic net, 1–14 koi, and either the project's own kohaku/sanke/tancho schemes or a colour per koi
+(`display.koiCount`, `display.koiColourMode: "preset" | "custom"`, `display.koiColours: ["#e08a4a", …]`). A
+custom colour becomes the koi's body and its saddles/fins are shades of it. The jellyfish scene is the vendored
+[ascii-jellyfish](https://github.com/lazaro-guerrero-losada/ascii-jellyfish) engine (MIT): moon, compass,
+lion's mane and crystal jellyfish cycle through `display.jellyCount` (1–8) in their natural tints. Both engines
+are loaded only for the chosen background; Detail, FPS and Brightness apply to all three scenes. The koi pond
+does not use an IntersectionObserver of its own, so the panel pauses it explicitly with the night screen and
+the idle-dim veil.

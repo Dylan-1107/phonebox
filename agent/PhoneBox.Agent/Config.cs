@@ -196,8 +196,17 @@ public sealed class DisplayConfig
     public string Accent { get; set; } = "#2dd4bf";
     /// <summary>Tint the background with the album art's colour while music plays.</summary>
     public bool ArtTint { get; set; } = true;
-    /// <summary>solid (the theme colour and its glow) or sharks (an animated ASCII ocean on pure black behind the widgets).</summary>
+    /// <summary>solid (the theme colour and its glow), sharks, koi or jellyfish (an animated ASCII
+    /// scene on pure black behind the widgets).</summary>
     public string Background { get; set; } = "solid";
+    /// <summary>How many koi swim in the koi pond, 1–14.</summary>
+    public int KoiCount { get; set; } = 5;
+    /// <summary>preset (the project's own kohaku/sanke/tancho schemes) or custom (one colour per koi).</summary>
+    public string KoiColourMode { get; set; } = "preset";
+    /// <summary>Custom koi colours, "#rrggbb" each, used in order when KoiColourMode is custom.</summary>
+    public List<string> KoiColours { get; set; } = [];
+    /// <summary>How many jellyfish drift in the jellyfish scene, 1–8.</summary>
+    public int JellyCount { get; set; } = 4;
     /// <summary>Which sharks the ocean shows, in order: a species and a skin colour each. Edited row by row
     /// in Settings › Display; a missing colour keeps the species tint.</summary>
     public List<OceanSharkConfig> OceanSharks { get; set; } = [];
@@ -670,6 +679,25 @@ public sealed partial class ConfigStore(string path)
     }
 
     /// <summary>Fills in defaults: builds pages from templates, migrates old pages, generates unique ids.</summary>
+    private static readonly string[] DefaultKoiColours =
+    [
+        "#e08a4a", "#d24b32", "#e0b44a", "#e88a88", "#c9c2b4", "#b06a4a", "#d9a066",
+        "#cf7a6a", "#e6c07a", "#b9785a", "#e0a0a0", "#c9885a", "#d8b48a", "#b86850"
+    ];
+
+    /// <summary>Keeps up to fourteen "#rrggbb" colours, filling missing entries with the default palette.</summary>
+    private static List<string> NormalizeKoiColours(List<string>? colours)
+    {
+        var list = (colours ?? []).Take(14).Select((c, i) =>
+        {
+            var v = c?.Trim().ToLowerInvariant();
+            return v is { Length: 7 } && v[0] == '#' && v[1..].All(Uri.IsHexDigit)
+                ? v : DefaultKoiColours[i % DefaultKoiColours.Length];
+        }).ToList();
+        while (list.Count < 14) list.Add(DefaultKoiColours[list.Count % DefaultKoiColours.Length]);
+        return list;
+    }
+
     private static readonly string[] OceanSharkKinds = ["classic", "hammerhead", "zebra", "tiger", "greathammer", "mako", "thresher", "nurse", "whale"];
     private static readonly string[] OceanSharkDefaultKinds = ["whale", "greathammer", "tiger", "thresher", "mako"];
     private static readonly string[] OceanSharkDefaultColors = ["#a9c7e8", "#d9c8a6", "#d8b0a6", "#a9cdb8", "#bdb2d8"];
@@ -715,7 +743,11 @@ public sealed partial class ConfigStore(string path)
             ? Cap(plexToken, 256) : null;
         c.Display ??= new();
         c.Display.Appearance?.Normalize();
-        c.Display.Background = c.Display.Background is "sharks" ? "sharks" : "solid";
+        c.Display.Background = c.Display.Background is "sharks" or "koi" or "jellyfish" ? c.Display.Background : "solid";
+        c.Display.KoiCount = Math.Clamp(c.Display.KoiCount, 1, 14);
+        c.Display.KoiColourMode = c.Display.KoiColourMode is "custom" ? "custom" : "preset";
+        c.Display.KoiColours = NormalizeKoiColours(c.Display.KoiColours);
+        c.Display.JellyCount = Math.Clamp(c.Display.JellyCount, 1, 8);
         c.Display.OceanSharks = NormalizeOceanSharks(c.Display.OceanSharks);
         c.Display.OceanDetail = c.Display.OceanDetail is "balanced" or "battery" ? c.Display.OceanDetail : "high";
         c.Display.OceanFish = Math.Clamp(c.Display.OceanFish, 0, 400);

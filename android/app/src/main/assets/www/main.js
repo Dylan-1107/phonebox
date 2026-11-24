@@ -2466,13 +2466,15 @@ export function tick() {
   applyBurnIn();
   document.body.classList.toggle('controls-top', cfg.display?.controlsTop === true);
   applyPageBar();
+  backdropPause?.(nightOn === true || document.body.classList.contains('dimmed'));
   if (!nightOn) emit('tick');
   setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
 }
 
-// ---------------------------------------------------------------- ASCII ocean backdrop
-// A fresh install (or a config without a list): one species per shark, muted colours. The settings
-// page edits this list row by row (species + colour), so the species names are checked here too.
+// ---------------------------------------------------------------- animated backdrops
+// Three small self-contained ASCII engines (all MIT, vendored): sharks draw the tank this started
+// with, koi the pond, jellyfish the drift. Only the chosen one is loaded, and it paints the fixed
+// canvas under #pager; the settings page owns their options.
 const OCEAN_KINDS = Object.freeze(['classic', 'hammerhead', 'zebra', 'tiger', 'greathammer', 'mako', 'thresher', 'nurse', 'whale']);
 const DEFAULT_OCEAN_SHARKS = Object.freeze([
   { kind: 'whale', color: '#a9c7e8' },
@@ -2482,6 +2484,13 @@ const DEFAULT_OCEAN_SHARKS = Object.freeze([
   { kind: 'mako', color: '#bdb2d8' },
 ]);
 const OCEAN_SIZES = [1, 0.95, 0.88, 0.9, 0.78, 0.84, 0.8, 0.76];
+const DEFAULT_KOI_COLOURS = Object.freeze([
+  '#e08a4a', '#d24b32', '#e0b44a', '#e88a88', '#c9c2b4', '#b06a4a', '#d9a066',
+  '#cf7a6a', '#e6c07a', '#b9785a', '#e0a0a0', '#c9885a', '#d8b48a', '#b86850',
+]);
+const JELLY_KINDS = Object.freeze(['compass', 'moon', 'lion', 'crystal']);
+// The koi engine reads its colours from this palette; pure black water, warm ink.
+const koiPalette = () => ({ water: '#000', ink: '#d7d2c8', accent: '#e8784f', koiLight: '#f0ece2', koiDark: '#0b0b0b', dark: true });
 
 /** "#a9c7e8" → the absolute skin colour [r, g, b]. The renderer shades it; it does not multiply a
  * species tint, so the whole shark follows the picked colour. */
@@ -2491,63 +2500,111 @@ function oceanColor(hex) {
   const n = parseInt(m[1], 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
-// How many canvas pixels per CSS pixel the ocean rasterises at, and how fine its glyph grid is.
-// High is a 1:1 physical image with ~160 columns across the panel; balanced halves the pixels;
-// battery keeps the original coarse grid.
+// How many canvas pixels per CSS pixel the scene rasterises at, and how fine the shark grid is.
 const OCEAN_DETAIL = Object.freeze({
   high: { dpr: 2, cellScale: 0.8 },
   balanced: { dpr: 1.5, cellScale: 1 },
   battery: { dpr: 1, cellScale: 1.25 },
 });
-let ocean = null, oceanModule = null, oceanKey = '', oceanGen = 0;
+let backdrop = null, backdropKind = '', backdropKey = '', backdropGen = 0, backdropPause = null;
+const backdropModules = {};
 
-function stopOcean() {
-  ocean?.destroy();
-  ocean = null;
-  oceanKey = '';
+function stopBackdrop() {
+  try { backdrop?.destroy?.(); } catch (_) {}
+  backdrop = null;
+  backdropKind = '';
+  backdropKey = '';
+  backdropPause = null;
 }
 
 /**
- * The ocean is a settings choice, not a widget: applyDisplay() runs every minute, so this must be
+ * The backdrop is a settings choice, not a widget: applyDisplay() runs every minute, so this must be
  * idempotent. It sits before the PREVIEW/bridge early return so the editor's live preview and a
- * desktop browser show it too. The canvas is a fixed layer under #pager (style.css); hiding it for
- * the night screen also pauses it through the engine's IntersectionObserver.
+ * desktop browser show it too. Hiding the canvas for the night screen pauses the shark and jellyfish
+ * engines through their IntersectionObserver; the koi pond is paused by tick().
  */
-async function applyOcean(d) {
-  const on = d.background === 'sharks';
-  document.body.classList.toggle('ocean', on);
-  if (!on) { stopOcean(); return; }
+async function applyBackdrop(d) {
+  const kind = ['sharks', 'koi', 'jellyfish'].includes(d.background) ? d.background : 'solid';
+  document.body.classList.toggle('ocean', kind !== 'solid');
+  if (kind === 'solid') { stopBackdrop(); return; }
   const rawOpacity = d.oceanOpacity == null ? 70 : Number(d.oceanOpacity);
   const opacity = Math.max(20, Math.min(100, Math.round(Number.isFinite(rawOpacity) ? rawOpacity : 70)));
   const dim = Math.max(0, Math.min(0.85, 1 - opacity / 100));
-  const list = (Array.isArray(d.oceanSharks) && d.oceanSharks.length ? d.oceanSharks : DEFAULT_OCEAN_SHARKS).slice(0, 8);
-  const cast = list.map((s, i) => ({ kind: OCEAN_KINDS.includes(s?.kind) ? s.kind : 'classic', size: OCEAN_SIZES[i] || 0.72 }));
-  const colors = list.map((s) => oceanColor(s?.color));
-  const rawFish = d.oceanFish == null ? 140 : Number(d.oceanFish);
-  const fish = Math.max(0, Math.min(400, Math.round(Number.isFinite(rawFish) ? rawFish : 140)));
   const rawFps = d.oceanFps == null ? 24 : Number(d.oceanFps);
   const fps = Math.max(24, Math.min(60, Math.round(Number.isFinite(rawFps) ? rawFps : 24)));
   const detail = OCEAN_DETAIL[d.oceanDetail] || OCEAN_DETAIL.high;
-  const still = d.oceanStill === true;
-  const key = [JSON.stringify(list), fish, fps, still, dim, d.oceanDetail].join('|');
-  if (ocean && key === oceanKey) return;
-  stopOcean();
-  const gen = ++oceanGen;
-  if (!oceanModule) {
-    try { oceanModule = await import('./ocean.js'); } catch (_) { return; }
+  const canvas = document.getElementById('ocean');
+  let key;
+
+  if (kind === 'sharks') {
+    const list = (Array.isArray(d.oceanSharks) && d.oceanSharks.length ? d.oceanSharks : DEFAULT_OCEAN_SHARKS).slice(0, 8);
+    const cast = list.map((s, i) => ({ kind: OCEAN_KINDS.includes(s?.kind) ? s.kind : 'classic', size: OCEAN_SIZES[i] || 0.72 }));
+    const colors = list.map((s) => oceanColor(s?.color));
+    const rawFish = d.oceanFish == null ? 140 : Number(d.oceanFish);
+    const fish = Math.max(0, Math.min(400, Math.round(Number.isFinite(rawFish) ? rawFish : 140)));
+    const still = d.oceanStill === true;
+    key = [JSON.stringify(list), fish, fps, still, dim, d.oceanDetail].join('|');
+    if (backdrop && kind === backdropKind && key === backdropKey) return;
+    stopBackdrop();
+    const gen = ++backdropGen;
+    try {
+      const mod = backdropModules.sharks || (backdropModules.sharks = await import('./ocean.js'));
+      if (gen !== backdropGen || cfg.display?.background !== 'sharks') return;
+      const engine = new mod.OceanEngine(canvas, cast, {
+        theme: 'dark', fish, fps, still, dim,
+        dpr: detail.dpr, cellScale: detail.cellScale, sharkColors: colors,
+        pointer: false,       // a backdrop: no click splashes, no fish fleeing the finger
+        contain: true,        // keep whole sharks in frame
+        clearCentre: false,   // the cards already provide the calm; the tank fills the screen
+      });
+      backdrop = { destroy: () => engine.destroy() };
+    } catch (_) { return; }
+  } else if (kind === 'koi') {
+    const count = Math.max(1, Math.min(14, Math.round(Number(d.koiCount) || 5)));
+    const custom = d.koiColourMode === 'custom';
+    const colours = custom
+      ? Array.from({ length: count }, (_, i) => (Array.isArray(d.koiColours) && d.koiColours[i]) || DEFAULT_KOI_COLOURS[i % DEFAULT_KOI_COLOURS.length])
+      : [];
+    key = [count, custom, JSON.stringify(colours), fps, dim, d.oceanDetail].join('|');
+    if (backdrop && kind === backdropKind && key === backdropKey) return;
+    stopBackdrop();
+    const gen = ++backdropGen;
+    try {
+      const mod = backdropModules.koi || (backdropModules.koi = await import('./koi.js'));
+      if (gen !== backdropGen || cfg.display?.background !== 'koi') return;
+      const pond = mod.createPond({
+        canvas, palette: koiPalette, count,
+        koiColours: colours,
+        dpr: () => detail.dpr, fps, plainWater: true, veil: dim,
+        dim: () => null,
+      });
+      pond.size(canvas.clientWidth || innerWidth, canvas.clientHeight || innerHeight);
+      pond.start();
+      const ro = new ResizeObserver(() => pond.size(canvas.clientWidth || innerWidth, canvas.clientHeight || innerHeight));
+      ro.observe(canvas);
+      backdropPause = (paused) => { try { pond.pause(paused); } catch (_) {} };
+      backdrop = { destroy: () => { try { pond.stop(); } catch (_) {} ro.disconnect(); } };
+    } catch (_) { return; }
+  } else {
+    const count = Math.max(1, Math.min(8, Math.round(Number(d.jellyCount) || 4)));
+    key = [count, fps, dim, d.oceanDetail].join('|');
+    if (backdrop && kind === backdropKind && key === backdropKey) return;
+    stopBackdrop();
+    const gen = ++backdropGen;
+    try {
+      if (!backdropModules.jelly) { await import('./jelly.js'); backdropModules.jelly = window.JellyfishEngine; }
+      if (gen !== backdropGen || cfg.display?.background !== 'jellyfish') return;
+      const Engine = backdropModules.jelly;
+      const specs = Array.from({ length: count }, (_, i) => ({
+        kind: JELLY_KINDS[i % JELLY_KINDS.length],
+        size: 1 - (i % JELLY_KINDS.length) * 0.06,
+      }));
+      const engine = new Engine(canvas, specs, { dpr: detail.dpr, fps, dim, pointer: false });
+      backdrop = { destroy: () => engine.destroy() };
+    } catch (_) { return; }
   }
-  // a later call (or a switch back to solid) superseded this one while the module was loading
-  if (gen !== oceanGen || cfg.display?.background !== 'sharks') return;
-  try {
-    ocean = new oceanModule.OceanEngine(document.getElementById('ocean'), cast, {
-      theme: 'dark', fish, fps, still, dim,
-      dpr: detail.dpr, cellScale: detail.cellScale, sharkColors: colors,
-      pointer: false,       // a backdrop: no click splashes, no fish fleeing the finger
-      contain: true,        // keep whole sharks in frame
-      clearCentre: false,   // the cards already provide the calm; the tank fills the screen
-    });
-    oceanKey = key;
-  } catch (_) { ocean = null; }
+  backdropKind = kind;
+  backdropKey = key;
 }
 
 // ---------------------------------------------------------------- data from the agent
@@ -2564,7 +2621,7 @@ export function applyDisplay() {
   document.documentElement.style.setProperty('--accent', `rgb(${DEFAULT_AMBIENT})`);
   artTint = d.artTint !== false;
   if (before !== DEFAULT_AMBIENT || !artTint) setAmbient(artTint ? currentArtColor : null);
-  applyOcean(d);
+  applyBackdrop(d);
   if (langChanged) { buildLayout(); renderApproval(); }
   renderRulesBtn();
   if (PREVIEW || !bridge) return;
