@@ -86,13 +86,16 @@ semi-transparent cards.
 | Setting | Values | Default |
 |---|---|---|
 | Background | solid / sharks | solid |
-| Sharks | classic (four) / hero (seven) / all (nine) | classic |
+| Sharks | five species, five colours / four classics / seven-species mix / all nine | five |
+| Detail | high (2x raster, 160 columns) / balanced / battery saver | high |
 | Fish | 0–400 | 140 |
 | Frames per second | 24–60 | 24 |
 | Brightness | 20–100 % | 70 |
 | One still frame | on / off | off |
 
-The simulation always steps at 60 Hz; `oceanFps` only throttles painting. On the desk tablet painting costs
-roughly 3 % of a CPU core per frame, so the animated default is 24 fps. `oceanStill` settles the tank and paints
-a single frame instead: near-zero CPU, but no motion. Fish are tinted per species (sardine, anchovy, silverside,
-mackerel, goby) so the school reads as colour over the black water.
+The simulation always steps at 60 Hz; `oceanFps` only throttles painting. On the desk tablet (2560 × 1600)
+painting costs roughly 1.5 cores at the high default and about 1.1 at balanced; the solid background is ~0.15
+and a still frame is close to it. `oceanStill` settles the tank and paints a single frame instead of animating.
+The five-shark cast uses one species and one strong tint per shark — whale, great hammerhead, tiger, thresher
+and mako — while the other casts keep the species' natural tints. Fish are tinted per species (sardine,
+anchovy, silverside, mackerel, goby) so the school reads as colour over the black water.

@@ -26,6 +26,8 @@ export interface OceanOptions {
   dim?: number;
   /** PhoneBox: cell size multiplier; 1.3 draws ~40% fewer glyphs at a coarser ASCII texture. */
   cellScale?: number;
+  /** PhoneBox: raster scale (1–2). 2 renders at device pixels (sharp); 1 halves the pixels. */
+  dpr?: number;
   /** Run a Game of Life on the same cells, seeded by this function on every resize. */
   life?: (life: Life) => void;
 }
@@ -43,6 +45,8 @@ export class OceanEngine {
   /** PhoneBox: seconds not yet drawn (frames may be drawn below 60 Hz) and the 1/fps budget. */
   private renderAcc = 0;
   private frameBudget = 1000 / 60;
+  /** PhoneBox: raster scale chosen at construction (1–2). */
+  private dprScale = 1;
   private visible = true;
   private still: boolean;
   private pointer: boolean;
@@ -63,6 +67,7 @@ export class OceanEngine {
     this.still = options.still ?? false;
     this.pointer = options.pointer ?? true;
     this.frameBudget = 1000 / Math.max(10, Math.min(60, options.fps ?? 60));
+    this.dprScale = Math.max(1, Math.min(2, options.dpr ?? 1));
     this.reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -109,9 +114,9 @@ export class OceanEngine {
   private resize() {
     const rect = this.canvas.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) return;
-    // PhoneBox: the ocean is a backdrop texture, drawn behind cards. At 2x it costs four times
-    // the pixels for no visible gain, so always rasterise at CSS pixels.
-    const dpr = 1;
+    // PhoneBox: the ocean is a backdrop texture, drawn behind cards, so the scale comes from the
+    // quality setting (2 = device pixels, 1 = half the pixels, 1.5 in between) instead of always 1.
+    const dpr = this.dprScale;
     this.renderer.resize(rect.width, rect.height, dpr);
     this.world.resize(rect.width, rect.height, this.renderer.cellWidth, this.renderer.cellHeight);
     if (this.frozen) this.drawStill();

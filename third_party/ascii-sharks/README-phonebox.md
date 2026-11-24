@@ -24,10 +24,11 @@ Then prepend the `/*! ascii-sharks (MIT) … */` header that is already at the t
 |---|---|---|
 | `src/renderer.ts` | `PALETTES.dark.grid` is `rgba(0,0,0,0)` | untouched cells must be true OLED black |
 | `src/renderer.ts` | `FISH_SCHOOLS` + per-species fish buckets | the school is tinted instead of one pale colour |
+| `src/renderer.ts` + `src/world.ts` | `SharkSpec.tint` → `SHARK_TINTS` per-cell tint | each shark in the five-shark cast gets its own colour, independent of its species |
 | `src/renderer.ts` | no background bitmap; `clearRect` on the opaque context, `dim` fill at the end | true black stage and an opaque layer that is cheap to composite under the cards |
 | `src/engine.ts` | `fps` option, render throttle with accumulated dt | 60 fps full-screen canvas is wasteful on the desk tablet |
-| `src/engine.ts` | DPR fixed at 1 | backdrop texture; 2x costs 4x the pixels for no visible gain |
-| `src/engine.ts` | `dim` and `cellScale` options | brightness without CSS opacity; fewer glyphs when a device needs it |
+| `src/engine.ts` | `dpr` option (1–2) | `high` detail rasterises 1:1 with the panel's physical pixels |
+| `src/engine.ts` | `dim` and `cellScale` options | brightness without CSS opacity; `cellScale` 0.8 gives the finer ~160-column grid |
 
-Everything else is upstream. `OceanEngine(canvas, sharks, { theme: "dark", fish, fps, still, dim } )` is what
-`main.js` creates.
+Everything else is upstream. `OceanEngine(canvas, sharks, { theme: "dark", fish, fps, still, dim, dpr,
+cellScale })` is what `main.js` creates.

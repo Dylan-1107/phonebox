@@ -36,6 +36,17 @@ const WAKE = DOT_RGB.length - 1;
 
 const ACCENTS = ["#e0892c", "#e03a32", "#b44ae0", "#33c8cc", "#3cb54a", "#3150e8", "#d9c14a"];
 
+// PhoneBox: strong skin tints for a mixed cast (one per shark, by SharkSpec.tint). They multiply the
+// grey shading, so highlights and shadow survive; species tints stay the fallback.
+const SHARK_TINTS: [number, number, number][] = [
+  [0.70, 0.92, 1.20], // ice blue
+  [1.20, 0.88, 0.60], // amber
+  [1.19, 0.70, 0.74], // coral
+  [0.68, 1.14, 0.84], // mint
+  [0.98, 0.74, 1.19], // violet
+];
+const NO_TINT = 255;
+
 export type Theme = "dark" | "light";
 /** How much of each shark to build. The blueprint pages step through these. */
 export type Stage = "spine" | "silhouette" | "shaded" | "full";
@@ -478,6 +489,8 @@ export class AsciiRenderer {
   private sharkKey = new Uint32Array(0);
   private sharkDepth = new Float32Array(0);
   private sharkKind = new Uint8Array(0);
+  /** Per-cell colour index into SHARK_TINTS; NO_TINT falls back to the species tint. */
+  private sharkTint = new Uint8Array(0);
   /** Cells darkened by a shark's shadow on the seabed. */
   private sharkShadow = new Uint8Array(0);
   private spine = new Float32Array(SHARK_NODES * 2);
@@ -571,6 +584,7 @@ export class AsciiRenderer {
       this.sharkKey = new Uint32Array(n);
       this.sharkDepth = new Float32Array(n);
       this.sharkKind = new Uint8Array(n);
+      this.sharkTint = new Uint8Array(n);
       this.sharkShadow = new Uint8Array(n);
       this.fishStamp = new Uint32Array(n);
     }
@@ -916,7 +930,7 @@ export class AsciiRenderer {
    * Fully covered cells become solid skin; partial cells become edge glyphs.
    */
   private rasterizeSharks(sharks: Shark[], t: number) {
-    const { sharkFlag, sharkShade, sharkKey, sharkDepth, sharkKind, sharkShadow, spine, arc, cw, ch, cols, rows } = this;
+    const { sharkFlag, sharkShade, sharkKey, sharkDepth, sharkKind, sharkTint, sharkShadow, spine, arc, cw, ch, cols, rows } = this;
     sharkFlag.fill(0);
     sharkShadow.fill(0);
 
@@ -928,6 +942,7 @@ export class AsciiRenderer {
       this.shape = SHAPES[sh.kind];
       this.sharkId = sh.id;
       const kindIndex = KINDS.indexOf(sh.kind);
+      const tintIndex = sh.tint != null && sh.tint >= 0 && sh.tint < SHARK_TINTS.length ? sh.tint : NO_TINT;
 
       // Travelling body wave, growing toward the tail.
       for (let k = 0; k < N; k++) {
@@ -1004,6 +1019,7 @@ export class AsciiRenderer {
           sharkKey[i] = key;
           sharkDepth[i] = sh.depth;
           sharkKind[i] = kindIndex;
+          sharkTint[i] = tintIndex;
 
           if (centerHit && coverage >= 0.6) {
             sharkFlag[i] = flag;
@@ -1022,7 +1038,7 @@ export class AsciiRenderer {
   }
 
   private drawSharks(t: number) {
-    const { ctx, cols, rows, cw, ch, sharkFlag, sharkShade, sharkKey, sharkDepth, sharkKind, palette, stage } = this;
+    const { ctx, cols, rows, cw, ch, sharkFlag, sharkShade, sharkKey, sharkDepth, sharkKind, sharkTint, palette, stage } = this;
     const n = cols * rows;
     for (let i = 0; i < n; i++) {
       const flag = sharkFlag[i];
@@ -1034,7 +1050,7 @@ export class AsciiRenderer {
       const key = sharkKey[i];
       const shade = sharkShade[i];
       const dim = 0.7 + 0.3 * sharkDepth[i];
-      const [tr, tg, tb] = SHAPES[KINDS[sharkKind[i]]].tint;
+      const [tr, tg, tb] = sharkTint[i] !== NO_TINT ? SHARK_TINTS[sharkTint[i]] : SHAPES[KINDS[sharkKind[i]]].tint;
 
       // Colours re-roll on a staggered clock so the hide shimmers.
       const tick = Math.floor(t * 2.4 + (key % 997) / 97);

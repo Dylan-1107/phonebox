@@ -190,8 +190,10 @@ public sealed class DisplayConfig
     public bool ArtTint { get; set; } = true;
     /// <summary>solid (the theme colour and its glow) or sharks (an animated ASCII ocean on pure black behind the widgets).</summary>
     public string Background { get; set; } = "solid";
-    /// <summary>Which sharks the ocean shows: classic (four), hero (seven) or all (nine species).</summary>
-    public string OceanCast { get; set; } = "classic";
+    /// <summary>Which sharks the ocean shows: five (five species, five colours), classic (four), hero (seven) or all (nine).</summary>
+    public string OceanCast { get; set; } = "five";
+    /// <summary>high (device pixels, sharpest), balanced (1.5x) or battery (1x) raster scale for the ocean.</summary>
+    public string OceanDetail { get; set; } = "high";
     /// <summary>Fish in the ocean; 0 leaves only the sharks.</summary>
     public int OceanFish { get; set; } = 140;
     /// <summary>Frames per second the ocean renders (24–60); the simulation always steps at 60 Hz. 24 is the
@@ -684,7 +686,8 @@ public sealed partial class ConfigStore(string path)
         c.Display ??= new();
         c.Display.Appearance?.Normalize();
         c.Display.Background = c.Display.Background is "sharks" ? "sharks" : "solid";
-        c.Display.OceanCast = c.Display.OceanCast is "hero" or "all" ? c.Display.OceanCast : "classic";
+        c.Display.OceanCast = c.Display.OceanCast is "classic" or "hero" or "all" ? c.Display.OceanCast : "five";
+        c.Display.OceanDetail = c.Display.OceanDetail is "balanced" or "battery" ? c.Display.OceanDetail : "high";
         c.Display.OceanFish = Math.Clamp(c.Display.OceanFish, 0, 400);
         c.Display.OceanFps = Math.Clamp(c.Display.OceanFps, 24, 60);
         c.Display.OceanOpacity = Math.Clamp(c.Display.OceanOpacity, 20, 100);

@@ -20,8 +20,9 @@ export const SHARK_NODES = 20;
 
 export type SharkKind = "classic" | "hammerhead" | "zebra" | "tiger" | "greathammer" | "mako" | "thresher" | "nurse" | "whale";
 
-/** Which sharks to put in the water; size is relative to the biggest. */
-export type SharkSpec = { kind: SharkKind; size: number };
+/** Which sharks to put in the water; size is relative to the biggest. tint picks a colour from the
+ * renderer's SHARK_TINTS (leave it out to use the species colour). */
+export type SharkSpec = { kind: SharkKind; size: number; tint?: number };
 
 // The landing hero: four of the same shark at different depths.
 const DEFAULT_SHARKS: SharkSpec[] = [
@@ -54,6 +55,8 @@ export interface Fish {
 export interface Shark {
   id: number;
   kind: SharkKind;
+  /** Renderer colour index (SHARK_TINTS); undefined keeps the species tint. */
+  tint?: number;
   length: number;
   /** Spine positions, snout first: [x0, y0, x1, y1, ...]. */
   nodes: Float32Array;
@@ -176,7 +179,7 @@ export class World {
 
     this.sharks = [];
     for (let i = 0; i < sharkCount; i++) {
-      const { kind, size } = this.sharkSpecs[i];
+      const { kind, size, tint } = this.sharkSpecs[i];
       const length = baseLength * size;
       const inset = this.insetFor(length);
       // Contained sharks orbit inside the inset, so the circuit itself never asks them to leave.
@@ -198,6 +201,7 @@ export class World {
       this.sharks.push({
         id: i + 1,
         kind,
+        tint,
         length,
         nodes,
         heading,

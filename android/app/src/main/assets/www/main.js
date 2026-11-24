@@ -2474,6 +2474,13 @@ export function tick() {
 // The casts are fixed here (the settings page picks a preset), so a hand-edited config can never ask
 // for a species the renderer does not know.
 const OCEAN_CASTS = Object.freeze({
+  five: [
+    { kind: 'whale', size: 1, tint: 0 },
+    { kind: 'greathammer', size: 0.95, tint: 1 },
+    { kind: 'tiger', size: 0.88, tint: 2 },
+    { kind: 'thresher', size: 0.9, tint: 3 },
+    { kind: 'mako', size: 0.78, tint: 4 },
+  ],
   classic: [
     { kind: 'classic', size: 1 }, { kind: 'classic', size: 0.7 },
     { kind: 'classic', size: 0.84 }, { kind: 'classic', size: 0.77 },
@@ -2491,6 +2498,14 @@ const OCEAN_CASTS = Object.freeze({
     { kind: 'mako', size: 0.8 }, { kind: 'nurse', size: 0.75 },
     { kind: 'zebra', size: 0.7 },
   ],
+});
+// How many canvas pixels per CSS pixel the ocean rasterises at, and how fine its glyph grid is.
+// High is a 1:1 physical image with ~160 columns across the panel; balanced halves the pixels;
+// battery keeps the original coarse grid.
+const OCEAN_DETAIL = Object.freeze({
+  high: { dpr: 2, cellScale: 0.8 },
+  balanced: { dpr: 1.5, cellScale: 1 },
+  battery: { dpr: 1, cellScale: 1.25 },
 });
 let ocean = null, oceanModule = null, oceanKey = '', oceanGen = 0;
 
@@ -2513,13 +2528,14 @@ async function applyOcean(d) {
   const rawOpacity = d.oceanOpacity == null ? 70 : Number(d.oceanOpacity);
   const opacity = Math.max(20, Math.min(100, Math.round(Number.isFinite(rawOpacity) ? rawOpacity : 70)));
   const dim = Math.max(0, Math.min(0.85, 1 - opacity / 100));
-  const cast = OCEAN_CASTS[d.oceanCast] || OCEAN_CASTS.classic;
+  const cast = OCEAN_CASTS[d.oceanCast] || OCEAN_CASTS.five;
   const rawFish = d.oceanFish == null ? 140 : Number(d.oceanFish);
   const fish = Math.max(0, Math.min(400, Math.round(Number.isFinite(rawFish) ? rawFish : 140)));
   const rawFps = d.oceanFps == null ? 24 : Number(d.oceanFps);
   const fps = Math.max(24, Math.min(60, Math.round(Number.isFinite(rawFps) ? rawFps : 24)));
+  const detail = OCEAN_DETAIL[d.oceanDetail] || OCEAN_DETAIL.high;
   const still = d.oceanStill === true;
-  const key = [d.oceanCast, fish, fps, still, dim].join('|');
+  const key = [d.oceanCast, fish, fps, still, dim, d.oceanDetail].join('|');
   if (ocean && key === oceanKey) return;
   stopOcean();
   const gen = ++oceanGen;
@@ -2531,6 +2547,7 @@ async function applyOcean(d) {
   try {
     ocean = new oceanModule.OceanEngine(document.getElementById('ocean'), cast, {
       theme: 'dark', fish, fps, still, dim,
+      dpr: detail.dpr, cellScale: detail.cellScale,
       pointer: false,       // a backdrop: no click splashes, no fish fleeing the finger
       contain: true,        // keep whole sharks in frame
       clearCentre: false,   // the cards already provide the calm; the tank fills the screen
