@@ -61,6 +61,9 @@ Every page is a 12 × 6 grid. Start a page from one of the 30 templates (or from
 More templates: **Clock**, **Focus** (pomodoro + note), **Calm** (breathing), **DevOps** (command widgets) and
 **Weekend** (forecast, music, moon, analog clock, quote).
 
+**Browser pages** can show user-configured sites in separate tabs. To add CrossDesk without changing the APK,
+see the [CrossDesk browser setup and WebRTC checks](CROSSDESK.md).
+
 **Getting around.** Swipe; press the phone's **volume keys** to flip pages; tap the page dots (or long-press an empty
 spot) for an overview of all pages and jump straight to one. Webhooks and rules can switch pages too; they count down
 first (*"switching to AI in 3…"*, with Stay and Go now) and never pull a page away while you are using the panel. The

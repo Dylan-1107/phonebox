@@ -1,0 +1,115 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PhoneBox WebRTC receive check</title>
+<style>body { margin: 0; background: #101820; color: white; font: 24px sans-serif; } video { width: 80vw; display: block; } </style>
+<p>WebRTC receive / unmuted autoplay</p>
+<video autoplay playsinline></video>
+<script>
+// A local sender stands in for a remote desktop. No camera, microphone, STUN or signaling server is used.
+// This checks WebView's receive/playback path, not CrossDesk's signaling or desktop encoder compatibility.
+window.result = { state: 'running' };
+(async () => {
+  const sender = new RTCPeerConnection({ iceServers: [] });
+  const receiver = new RTCPeerConnection({ iceServers: [] });
+  const canvas = document.createElement('canvas');
+  canvas.width = 320;
+  canvas.height = 180;
+  const ctx = canvas.getContext('2d');
+  let frame = 0;
+  const timer = setInterval(() => {
+    ctx.fillStyle = '#20c060';
+    ctx.fillRect(0, 0, 320, 180);
+    ctx.fillStyle = '#ff4040';
+    ctx.fillRect((frame++ * 4) % 280, 90, 40, 40);
+  }, 50);
+  const stream = canvas.captureStream(20);
+  // An audio track keeps the receiver unmuted, exercising the media autoplay policy without sound or capture.
+  const audio = new AudioContext();
+  const oscillator = audio.createOscillator();
+  const gain = audio.createGain();
+  gain.gain.value = 0;
+  oscillator.connect(gain);
+  const destination = audio.createMediaStreamDestination();
+  gain.connect(destination);
+  oscillator.start();
+  stream.addTrack(destination.stream.getAudioTracks()[0]);
+  const video = document.querySelector('video');
+  const incoming = new MediaStream();
+  receiver.ontrack = ({ track }) => { incoming.addTrack(track); video.srcObject = incoming; };
+  stream.getTracks().forEach(track => sender.addTrack(track, stream));
+  // Diagnostics printed with a failure instead of guessed conclusions: connection states, tracks, decoder counters.
+  window.diag = {};
+  const diagTimer = setInterval(async () => {
+    const stats = await receiver.getStats().catch(() => null);
+    const inbound = stats && [...stats.values()].find(s => s.type === 'inbound-rtp' && s.kind === 'video');
+    window.diag = {
+      senderIce: sender.iceConnectionState, receiverIce: receiver.iceConnectionState,
+      senderConn: sender.connectionState, receiverConn: receiver.connectionState,
+      videoTracks: incoming.getVideoTracks().map(t => t.readyState), audioTracks: incoming.getAudioTracks().map(t => t.readyState),
+      readyState: video.readyState, paused: video.paused, muted: video.muted, width: video.videoWidth,
+      currentTime: video.currentTime, framesDecoded: inbound?.framesDecoded, bytesReceived: inbound?.bytesReceived,
+      packetsReceived: inbound?.packetsReceived, jitter: inbound?.jitter, error: video.error && video.error.message,
+    };
+  }, 500);
+  const iceDone = pc => pc.iceGatheringState === 'complete' ? Promise.resolve() : new Promise(resolve => {
+    const listener = () => { if (pc.iceGatheringState === 'complete') { pc.removeEventListener('icegatheringstatechange', listener); resolve(); } };
+    pc.addEventListener('icegatheringstatechange', listener);
+  });
+  const timeout = setTimeout(() => { window.result = { state: 'failed', error: 'receive timeout', diag: window.diag }; cleanup(); }, 20000);
+  function cleanup() {
+    clearInterval(timer);
+    clearInterval(diagTimer);
+    stream.getTracks().forEach(track => track.stop());
+    sender.close(); receiver.close(); audio.close();
+  }
+  window.cleanup = cleanup;
+  await sender.setLocalDescription(await sender.createOffer());
+  await iceDone(sender);
+  await receiver.setRemoteDescription(sender.localDescription);
+  await receiver.setLocalDescription(await receiver.createAnswer());
+  await iceDone(receiver);
+  await sender.setRemoteDescription(receiver.localDescription);
+  // Autoplay is what this check measures; a rejection is reported rather than retried.
+  video.play().catch(error => { window.playError = String(error); });
+  let presented = 0;
+  // WebView builds without requestVideoFrameCallback still show the video; currentTime advancing is then the signal.
+  if (typeof video.requestVideoFrameCallback === 'function') {
+    const count = () => { presented++; if (window.result.state === 'running') video.requestVideoFrameCallback(count); };
+    video.requestVideoFrameCallback(count);
+  } else {
+    const tick = setInterval(() => { if (video.currentTime > 0) presented++; }, 50);
+    setTimeout(() => clearInterval(tick), 25000);
+  }
+  // Decoded frames from getStats are the ground truth; requestVideoFrameCallback is only extra evidence.
+  const check = setInterval(() => {
+    if (window.result.state !== 'running') { clearInterval(check); return; }
+    try {
+      receiver.getStats().then(stats => {
+        if (window.result.state !== 'running') return;
+        const inbound = [...stats.values()].find(s => s.type === 'inbound-rtp' && s.kind === 'video');
+        const codec = inbound && stats.get(inbound.codecId);
+        if (!inbound || inbound.framesDecoded < 8 || video.currentTime < 0.3) return;
+        const sample = document.createElement('canvas');
+        sample.width = 320; sample.height = 180;
+        const sampleCtx = sample.getContext('2d');
+        sampleCtx.drawImage(video, 0, 0);
+        const pixel = [...sampleCtx.getImageData(10, 10, 1, 1).data];
+        const ok = !video.paused && !video.muted && video.videoWidth === 320 && video.videoHeight === 180 &&
+          pixel[1] > 150 && pixel[0] < 80;
+        window.result = { state: ok ? 'passed' : 'failed', presented, framesDecoded: inbound.framesDecoded,
+          width: video.videoWidth, height: video.videoHeight, currentTime: video.currentTime,
+          paused: video.paused, muted: video.muted, codec: codec?.mimeType, pixel,
+          playError: window.playError || null, diag: window.diag };
+        clearInterval(check); clearTimeout(timeout);
+        // Keep the moving picture alive for the instrumentation screenshot; the test calls cleanup afterwards.
+      }).catch(error => {
+        window.result = { state: 'failed', error: 'stats: ' + String(error), diag: window.diag };
+        clearInterval(check); clearTimeout(timeout);
+      });
+    } catch (error) {
+      window.result = { state: 'failed', error: 'check: ' + String(error), diag: window.diag };
+      clearInterval(check); clearTimeout(timeout);
+    }
+  }, 100);
+})().catch(error => { window.result = { state: 'failed', error: String(error) }; window.cleanup?.(); });
+</script>
