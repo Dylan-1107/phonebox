@@ -17,12 +17,15 @@ public sealed partial class BatteryMonitor
     /// <summary>Budget for one round of vendor HID scans (Razer, Rapoo, bytech).</summary>
     internal const long VendorHidBudgetMs = 6_000;
 
+    /// <summary>How old a reading saved on disk may be before it is no longer shown after a restart.</summary>
+    internal const long VendorCacheMaxAgeMs = 30L * 24 * 60 * 60 * 1000;
+
     /// <summary>
     /// Resolves one round of vendor samples. A device that answered gets its fresh reading and
     /// refreshes the cache; a receiver that is present but silent (the peripheral is asleep) keeps
     /// its last good reading, because the battery barely moves while it sleeps and a vanishing row
     /// is worse than a value from an hour ago. A receiver that is gone drops its row and its cache
-    /// entry immediately, so unplugging is honest.
+    /// entry immediately, so unplugging is honest. <paramref name="now"/> is Unix milliseconds.
     /// </summary>
     internal static List<DeviceBattery> ResolveHidSamples(
         IEnumerable<HidSample> present,
@@ -37,8 +40,18 @@ public sealed partial class BatteryMonitor
             DeviceBattery device;
             if (sample.Level is { } level)
             {
-                device = new DeviceBattery(sample.Name, Math.Clamp(level, 0, 100), sample.Kind, sample.Charging);
-                cache[sample.Key] = (device, now);
+                var fresh = new DeviceBattery(sample.Name, Math.Clamp(level, 0, 100), sample.Kind, sample.Charging);
+                if (cache.TryGetValue(sample.Key, out var previous)
+                    && previous.Device.Level == fresh.Level && previous.Device.Charging == fresh.Charging)
+                {
+                    // Unchanged: keep the old timestamp so the cache file is not rewritten every scan.
+                    device = previous.Device;
+                }
+                else
+                {
+                    device = fresh;
+                    cache[sample.Key] = (fresh, now);
+                }
             }
             else if (cache.TryGetValue(sample.Key, out var last))
             {
@@ -54,6 +67,47 @@ public sealed partial class BatteryMonitor
         foreach (var key in cache.Keys.Where(k => !seen.Contains(k)).ToList())
             cache.Remove(key);
         return devices.Values.ToList();
+    }
+
+    private sealed record CacheFile(int Version, List<CacheEntry> Devices);
+    private sealed record CacheEntry(string Key, string Name, string Kind, int Level, bool? Charging, long At);
+
+    /// <summary>Reads the readings saved by the previous run; malformed or expired entries are skipped.</summary>
+    internal static Dictionary<string, (DeviceBattery Device, long At)> ReadBatteryCache(string path, long nowUnixMs, long maxAgeMs)
+    {
+        var cache = new Dictionary<string, (DeviceBattery, long)>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            if (!File.Exists(path)) return cache;
+            var file = System.Text.Json.JsonSerializer.Deserialize<CacheFile>(File.ReadAllText(path));
+            if (file?.Devices is null) return cache;
+            foreach (var entry in file.Devices)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Key) || string.IsNullOrWhiteSpace(entry.Name)) continue;
+                if (entry.Level is < 0 or > 100) continue;
+                if (entry.At > nowUnixMs + 86_400_000 || nowUnixMs - entry.At > maxAgeMs) continue;
+                cache[entry.Key] = (new DeviceBattery(entry.Name, entry.Level, entry.Kind, entry.Charging), entry.At);
+            }
+        }
+        catch { }
+        return cache;
+    }
+
+    /// <summary>Writes the readings for the next run; failures are ignored, the feature is best effort.</summary>
+    internal static void WriteBatteryCache(string path, IEnumerable<KeyValuePair<string, (DeviceBattery Device, long At)>> cache)
+    {
+        try
+        {
+            var entries = cache
+                .Select(kv => new CacheEntry(kv.Key, kv.Value.Device.Name, kv.Value.Device.Kind, kv.Value.Device.Level, kv.Value.Device.Charging, kv.Value.At))
+                .ToList();
+            var json = System.Text.Json.JsonSerializer.Serialize(new CacheFile(1, entries));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var temp = path + ".tmp";
+            File.WriteAllText(temp, json);
+            File.Move(temp, path, true);
+        }
+        catch { }
     }
 
 #if WINDOWS

@@ -27,6 +27,8 @@ public static class AppPaths
 
     public static readonly string ConfigPath = Path.Combine(ConfigDir, "config.json");
     public static readonly string LogPath = Path.Combine(LocalDir, "agent.log");
+    /// <summary>The last battery reading of each 2.4 GHz device, so its row survives an agent restart.</summary>
+    public static readonly string BatteryCachePath = Path.Combine(LocalDir, "battery-cache.json");
 
     /// <summary>Where install scripts put the agent; self-update only works for this copy.</summary>
     public static readonly string InstallDir = Path.Combine(LocalDir, "app");

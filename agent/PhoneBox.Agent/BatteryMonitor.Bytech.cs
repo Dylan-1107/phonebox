@@ -38,10 +38,10 @@ public sealed partial class BatteryMonitor
 #if WINDOWS
     /// <summary>
     /// A sleeping keyboard does not consume output reports: the write stays pending until it is
-    /// cancelled, and the receiver answers nothing. Back off for two minutes instead of poking it
+    /// cancelled, and the receiver answers nothing. Back off for half a minute instead of poking it
     /// every scan; the last good reading stays on screen through the cooldown.
     /// </summary>
-    private const long BytechQuietMs = 120_000;
+    private const long BytechQuietMs = 30_000;
     private static long _bytechRetryAfter;
 
     private static (List<HidSample> Samples, string? Error) WindowsBytech(long deadline)

@@ -27,6 +27,7 @@ public sealed partial class BatteryMonitor(ILogger<BatteryMonitor> log) : Backgr
     private IReadOnlyList<DeviceBattery> _razerDevices = [];
     private IReadOnlyList<DeviceBattery> _vendorDevices = [];
     private readonly Dictionary<string, (DeviceBattery Device, long At)> _vendorLastGood = new(StringComparer.OrdinalIgnoreCase);
+    private string? _savedVendorCache;
     private Task? _hidTask;
 #endif
     private long _lastRequest = NoRequest;
@@ -40,6 +41,10 @@ public sealed partial class BatteryMonitor(ILogger<BatteryMonitor> log) : Backgr
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+#if WINDOWS
+        // The rows of 2.4 GHz devices survive the agent restarting (an update, a reboot) this way.
+        LoadVendorCache();
+#endif
         while (!ct.IsCancellationRequested)
         {
             var lastRequest = Interlocked.Read(ref _lastRequest);
@@ -86,12 +91,15 @@ public sealed partial class BatteryMonitor(ILogger<BatteryMonitor> log) : Backgr
                         var (razer, razerError) = WindowsRazer();
                         if (razerError is not null) log.LogDebug("batteries (razer): {Msg}", razerError);
 
+                        List<KeyValuePair<string, (DeviceBattery Device, long At)>> snapshot;
                         lock (_publishLock)
                         {
                             _razerDevices = razer;
-                            _vendorDevices = SortDevices(ResolveHidSamples(samples, _vendorLastGood, Environment.TickCount64));
+                            _vendorDevices = SortDevices(ResolveHidSamples(samples, _vendorLastGood, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
                             Publish();
+                            snapshot = _vendorLastGood.ToList();
                         }
+                        SaveVendorCache(snapshot);
                     }, ct);
                 }
 #else
@@ -110,6 +118,24 @@ public sealed partial class BatteryMonitor(ILogger<BatteryMonitor> log) : Backgr
     /// <summary>Bluetooth first, then vendor HID readings, with same-name entries merged. Caller holds the lock.</summary>
     private void Publish()
         => _devices = SortDevices(MergeHidIntoBluetooth(MergeHidIntoBluetooth(_btDevices, _razerDevices), _vendorDevices));
+
+    /// <summary>Seeds the cache with what the previous run last read, so a sleeping keyboard still has a row.</summary>
+    private void LoadVendorCache()
+    {
+        foreach (var entry in ReadBatteryCache(AppPaths.BatteryCachePath, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), VendorCacheMaxAgeMs))
+            _vendorLastGood[entry.Key] = entry.Value;
+    }
+
+    /// <summary>Writes the cache when a reading changed (not on every scan).</summary>
+    private void SaveVendorCache(List<KeyValuePair<string, (DeviceBattery Device, long At)>> snapshot)
+    {
+        var signature = string.Join('\n', snapshot
+            .OrderBy(kv => kv.Key, StringComparer.Ordinal)
+            .Select(kv => $"{kv.Key}={kv.Value.Device.Level}/{kv.Value.Device.Charging}/{kv.Value.At}"));
+        if (signature == _savedVendorCache) return;
+        WriteBatteryCache(AppPaths.BatteryCachePath, snapshot);
+        _savedVendorCache = signature;
+    }
 #endif
 
 #if !WINDOWS

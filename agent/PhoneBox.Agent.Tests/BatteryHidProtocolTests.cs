@@ -158,4 +158,69 @@ public sealed class BatteryHidProtocolTests
 
         Assert.Equal([new DeviceBattery("AULA F87S 8K", 79, "keyboard", true)], devices);
     }
+
+    [Fact]
+    public void BatteryCacheRoundTripsAndExpiresOldReadings()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "phonebox-battery-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var cache = new Dictionary<string, (DeviceBattery Device, long At)>
+            {
+                ["keyboard|AULA F87S 8K"] = (new DeviceBattery("AULA F87S 8K", 37, "keyboard", false), 1_000_000),
+                ["mouse|Rapoo VT3PRO"] = (new DeviceBattery("Rapoo VT3PRO", 62, "mouse", null), 1_000_000)
+            };
+            BatteryMonitor.WriteBatteryCache(path, cache);
+
+            var loaded = BatteryMonitor.ReadBatteryCache(path, 1_060_000, 3_600_000);
+            Assert.Equal(2, loaded.Count);
+            Assert.Equal(new DeviceBattery("AULA F87S 8K", 37, "keyboard", false), loaded["keyboard|AULA F87S 8K"].Device);
+            Assert.Equal(62, loaded["mouse|Rapoo VT3PRO"].Device.Level);
+
+            // Older than the allowed age: a restart must not resurrect an ancient value.
+            Assert.Empty(BatteryMonitor.ReadBatteryCache(path, 4_600_001, 3_600_000));
+        }
+        finally
+        {
+            File.Delete(path);
+            File.Delete(path + ".tmp");
+        }
+    }
+
+    [Fact]
+    public void CorruptBatteryCacheIsIgnoredAndAFreshReadingStillWins()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "phonebox-battery-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(path, "{ not json");
+            var cache = BatteryMonitor.ReadBatteryCache(path, 1_000_000, 3_600_000);
+            Assert.Empty(cache);
+
+            var devices = BatteryMonitor.ResolveHidSamples(
+                [new BatteryMonitor.HidSample("AULA F87S 8K", "keyboard", 35, false)],
+                cache, 1_000_000);
+            Assert.Equal([new DeviceBattery("AULA F87S 8K", 35, "keyboard", false)], devices);
+        }
+        finally
+        {
+            File.Delete(path);
+            File.Delete(path + ".tmp");
+        }
+    }
+
+    [Fact]
+    public void UnchangedReadingKeepsItsCacheTimestampSoTheFileIsNotRewritten()
+    {
+        var cache = new Dictionary<string, (DeviceBattery Device, long At)>
+        {
+            ["mouse|Rapoo VT3PRO"] = (new DeviceBattery("Rapoo VT3PRO", 62, "mouse", null), 1_000)
+        };
+
+        BatteryMonitor.ResolveHidSamples(
+            [new BatteryMonitor.HidSample("Rapoo VT3PRO", "mouse", 62, null)],
+            cache, 9_999);
+
+        Assert.Equal(1_000, cache["mouse|Rapoo VT3PRO"].At);
+    }
 }
