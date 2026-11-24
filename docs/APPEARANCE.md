@@ -86,7 +86,7 @@ semi-transparent cards.
 | Setting | Values | Default |
 |---|---|---|
 | Background | solid / sharks | solid |
-| Sharks | five species, five colours / four classics / seven-species mix / all nine | five |
+| Sharks | a species and a colour per shark, 1–8 sharks | five muted defaults |
 | Detail | high (2x raster, 160 columns) / balanced / battery saver | high |
 | Fish | 0–400 | 140 |
 | Frames per second | 24–60 | 24 |
@@ -96,6 +96,9 @@ semi-transparent cards.
 The simulation always steps at 60 Hz; `oceanFps` only throttles painting. On the desk tablet (2560 × 1600)
 painting costs roughly 1.5 cores at the high default and about 1.1 at balanced; the solid background is ~0.15
 and a still frame is close to it. `oceanStill` settles the tank and paints a single frame instead of animating.
-The five-shark cast uses one species and one strong tint per shark — whale, great hammerhead, tiger, thresher
-and mako — while the other casts keep the species' natural tints. Fish are tinted per species (sardine,
-anchovy, silverside, mackerel, goby) so the school reads as colour over the black water.
+Each shark is edited on its own row in Settings › Display: a species (classic, hammerhead, zebra, tiger, great
+hammerhead, mako, thresher, nurse or whale) and a colour picker. The list is stored as
+`display.oceanSharks: [{ "kind": "whale", "color": "#a9c7e8" }, …]`; a missing or invalid colour keeps the
+species' own tint. The defaults are deliberately muted pastels, and the Brightness slider dims the whole ocean.
+Fish are tinted per species (sardine, anchovy, silverside, mackerel, goby) so the school reads as colour over the
+black water.

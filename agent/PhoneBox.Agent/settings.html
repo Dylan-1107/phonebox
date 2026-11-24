@@ -714,9 +714,12 @@ nav a.on::before { color: var(--accent); }
           <select data-bind="display.background"><option value="solid" data-i18n="s.display.background.solid">Solid colour (theme)</option><option value="sharks" data-i18n="s.display.background.sharks">ASCII ocean (pure black)</option></select>
           <span class="hint" data-i18n="s.display.backgroundHint">A live ASCII shark tank behind the widgets. Cards, pages and the grid stay exactly as they are.</span></div>
         <div id="oceanOptions" hidden>
+          <div class="field" style="max-width:560px"><label data-i18n="s.display.oceanSharks">Sharks</label>
+            <div id="oceanSharkRows"></div>
+            <button class="btn sm" type="button" id="oceanAddShark" data-i18n="s.display.oceanAddShark">Add a shark</button>
+            <span class="hint" data-i18n="s.display.oceanSharksHint">Pick a species and a colour for each shark. Colours are muted by default; the picker sets the skin tint, and Brightness dims the whole ocean.</span>
+          </div>
           <div class="row" style="gap:16px;margin-bottom:8px;align-items:flex-end;flex-wrap:wrap">
-            <div class="field" style="margin:0"><label data-i18n="s.display.oceanCast">Sharks</label>
-              <select data-bind="display.oceanCast"><option value="five" data-i18n="s.display.oceanCast.five">Five species, five colours</option><option value="classic" data-i18n="s.display.oceanCast.classic">Four classics</option><option value="hero" data-i18n="s.display.oceanCast.hero">Seven-species mix</option><option value="all" data-i18n="s.display.oceanCast.all">All nine species</option></select></div>
             <div class="field" style="margin:0"><label data-i18n="s.display.oceanFish">Fish</label><input type="number" min="0" max="400" data-bind="display.oceanFish" data-type="int" style="width:90px"></div>
             <div class="field" style="margin:0"><label data-i18n="s.display.oceanDetail">Detail</label>
               <select data-bind="display.oceanDetail"><option value="high" data-i18n="s.display.oceanDetail.high">High (sharpest)</option><option value="balanced" data-i18n="s.display.oceanDetail.balanced">Balanced</option><option value="battery" data-i18n="s.display.oceanDetail.battery">Battery saver</option></select></div>
@@ -3649,10 +3652,33 @@ function bindLanguage() {
   if ($('displayLangSel')) $('displayLangSel').onchange = (e) => onPick(e.target.value);
 }
 
+const OCEAN_SHARK_KINDS = ['classic', 'hammerhead', 'zebra', 'tiger', 'greathammer', 'mako', 'thresher', 'nurse', 'whale'];
+const OCEAN_SHARK_COLORS = ['#a9c7e8', '#d9c8a6', '#d8b0a6', '#a9cdb8', '#bdb2d8', '#c8c2a8', '#a8c8c8', '#c4b2c8'];
+
+function renderOceanSharks() {
+  const box = $('oceanSharkRows');
+  if (!box) return;
+  const list = Array.isArray(cfg.display?.oceanSharks) ? cfg.display.oceanSharks : [];
+  box.replaceChildren(...list.map((s, i) => {
+    const sel = h('select', { style: { minWidth: '150px' }, onchange: (e) => { s.kind = e.target.value; changed(); } },
+      ...OCEAN_SHARK_KINDS.map((k) => h('option', { value: k }, t('s.display.shark.' + k))));
+    sel.value = OCEAN_SHARK_KINDS.includes(s.kind) ? s.kind : 'classic';
+    const color = h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(s.color || '') ? s.color : '#8899aa',
+      style: { width: '56px', height: '34px', padding: '2px' }, oninput: (e) => { s.color = e.target.value; changed(); } });
+    const del = h('button', { class: 'btn sm', type: 'button',
+      onclick: () => { list.splice(i, 1); if (!list.length) list.push({ kind: 'classic', color: OCEAN_SHARK_COLORS[0] }); renderOceanSharks(); changed(); } },
+      t('s.display.oceanRemoveShark'));
+    return h('div', { class: 'row', style: { gap: '8px', alignItems: 'center', margin: '0 0 6px' } }, sel, color, del);
+  }));
+  const add = $('oceanAddShark');
+  if (add) add.disabled = list.length >= 8;
+}
+
 function renderOceanOptions() {
   const d = cfg.display || {};
   $('oceanOptions').hidden = d.background !== 'sharks';
   $('oov').textContent = Math.round(d.oceanOpacity ?? 70) + '%';
+  renderOceanSharks();
 }
 
 function bindForm() {
@@ -3685,6 +3711,14 @@ function bindForm() {
   bindCodexBar();
   renderPhotoSource();
   renderOceanOptions();
+  const addShark = $('oceanAddShark');
+  if (addShark) addShark.onclick = () => {
+    const list = cfg.display.oceanSharks = Array.isArray(cfg.display.oceanSharks) ? cfg.display.oceanSharks : [];
+    if (list.length >= 8) return;
+    list.push({ kind: 'classic', color: OCEAN_SHARK_COLORS[list.length % OCEAN_SHARK_COLORS.length] });
+    renderOceanSharks();
+    changed();
+  };
   $('nbv').textContent = Math.round(cfg.night.brightness * 100) + '%';
 }
 
@@ -3797,7 +3831,13 @@ function fillDefaults() {
   cfg.codexBar ??= { providers: ['claude', 'codex', 'antigravity'], rotate: true, pageSize: 2, rotateInterval: 8 };
   for (const [k, v] of Object.entries({ language: 'auto', hour12: false, idleReturnSec: 90, switchCountdownSec: 3, touchGraceSec: 20, minDwellSec: 15, holdMaxMin: 30, keepAwake: true, openOnConnect: true,
     showSeconds: true, vibrate: true, finishToast: true, volumeKeys: true, artTint: true, nightWhenUnreachable: false, unreachableNightDelayMin: 5, proximityWake: true, orientation: 'landscape', theme: 'default', accent: '#2dd4bf',
-    background: 'solid', oceanCast: 'five', oceanDetail: 'high', oceanFish: 140, oceanFps: 24, oceanOpacity: 70, oceanStill: false })) cfg.display[k] ??= v;
+    background: 'solid', oceanDetail: 'high', oceanFish: 140, oceanFps: 24, oceanOpacity: 70, oceanStill: false })) cfg.display[k] ??= v;
+  // the five muted defaults; the real list comes back from the agent once it is saved
+  cfg.display.oceanSharks ??= [
+    { kind: 'whale', color: '#a9c7e8' }, { kind: 'greathammer', color: '#d9c8a6' },
+    { kind: 'tiger', color: '#d8b0a6' }, { kind: 'thresher', color: '#a9cdb8' },
+    { kind: 'mako', color: '#bdb2d8' },
+  ];
   cfg.charge ??= { enabled: false, min: 50, max: 80, method: 'ha' };
   cfg.steam ??= { enabled: false };
 }

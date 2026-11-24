@@ -2471,34 +2471,25 @@ export function tick() {
 }
 
 // ---------------------------------------------------------------- ASCII ocean backdrop
-// The casts are fixed here (the settings page picks a preset), so a hand-edited config can never ask
-// for a species the renderer does not know.
-const OCEAN_CASTS = Object.freeze({
-  five: [
-    { kind: 'whale', size: 1, tint: 0 },
-    { kind: 'greathammer', size: 0.95, tint: 1 },
-    { kind: 'tiger', size: 0.88, tint: 2 },
-    { kind: 'thresher', size: 0.9, tint: 3 },
-    { kind: 'mako', size: 0.78, tint: 4 },
-  ],
-  classic: [
-    { kind: 'classic', size: 1 }, { kind: 'classic', size: 0.7 },
-    { kind: 'classic', size: 0.84 }, { kind: 'classic', size: 0.77 },
-  ],
-  hero: [
-    { kind: 'whale', size: 1.05 }, { kind: 'greathammer', size: 0.95 },
-    { kind: 'whale', size: 0.88 }, { kind: 'thresher', size: 0.85 },
-    { kind: 'hammerhead', size: 0.85 }, { kind: 'tiger', size: 0.78 },
-    { kind: 'hammerhead', size: 0.76 },
-  ],
-  all: [
-    { kind: 'whale', size: 1.3 }, { kind: 'greathammer', size: 1.1 },
-    { kind: 'hammerhead', size: 1 }, { kind: 'tiger', size: 0.95 },
-    { kind: 'thresher', size: 0.9 }, { kind: 'classic', size: 0.85 },
-    { kind: 'mako', size: 0.8 }, { kind: 'nurse', size: 0.75 },
-    { kind: 'zebra', size: 0.7 },
-  ],
-});
+// A fresh install (or a config without a list): one species per shark, muted colours. The settings
+// page edits this list row by row (species + colour), so the species names are checked here too.
+const OCEAN_KINDS = Object.freeze(['classic', 'hammerhead', 'zebra', 'tiger', 'greathammer', 'mako', 'thresher', 'nurse', 'whale']);
+const DEFAULT_OCEAN_SHARKS = Object.freeze([
+  { kind: 'whale', color: '#a9c7e8' },
+  { kind: 'greathammer', color: '#d9c8a6' },
+  { kind: 'tiger', color: '#d8b0a6' },
+  { kind: 'thresher', color: '#a9cdb8' },
+  { kind: 'mako', color: '#bdb2d8' },
+]);
+const OCEAN_SIZES = [1, 0.95, 0.88, 0.9, 0.78, 0.84, 0.8, 0.76];
+
+/** "#a9c7e8" → the r/g/b multipliers the renderer tints the grey skin with. */
+function oceanTint(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [((n >> 16) & 255) / 255 * 1.15, ((n >> 8) & 255) / 255 * 1.15, (n & 255) / 255 * 1.15];
+}
 // How many canvas pixels per CSS pixel the ocean rasterises at, and how fine its glyph grid is.
 // High is a 1:1 physical image with ~160 columns across the panel; balanced halves the pixels;
 // battery keeps the original coarse grid.
@@ -2528,14 +2519,16 @@ async function applyOcean(d) {
   const rawOpacity = d.oceanOpacity == null ? 70 : Number(d.oceanOpacity);
   const opacity = Math.max(20, Math.min(100, Math.round(Number.isFinite(rawOpacity) ? rawOpacity : 70)));
   const dim = Math.max(0, Math.min(0.85, 1 - opacity / 100));
-  const cast = OCEAN_CASTS[d.oceanCast] || OCEAN_CASTS.five;
+  const list = (Array.isArray(d.oceanSharks) && d.oceanSharks.length ? d.oceanSharks : DEFAULT_OCEAN_SHARKS).slice(0, 8);
+  const cast = list.map((s, i) => ({ kind: OCEAN_KINDS.includes(s?.kind) ? s.kind : 'classic', size: OCEAN_SIZES[i] || 0.72 }));
+  const tints = list.map((s) => oceanTint(s?.color));
   const rawFish = d.oceanFish == null ? 140 : Number(d.oceanFish);
   const fish = Math.max(0, Math.min(400, Math.round(Number.isFinite(rawFish) ? rawFish : 140)));
   const rawFps = d.oceanFps == null ? 24 : Number(d.oceanFps);
   const fps = Math.max(24, Math.min(60, Math.round(Number.isFinite(rawFps) ? rawFps : 24)));
   const detail = OCEAN_DETAIL[d.oceanDetail] || OCEAN_DETAIL.high;
   const still = d.oceanStill === true;
-  const key = [d.oceanCast, fish, fps, still, dim, d.oceanDetail].join('|');
+  const key = [JSON.stringify(list), fish, fps, still, dim, d.oceanDetail].join('|');
   if (ocean && key === oceanKey) return;
   stopOcean();
   const gen = ++oceanGen;
@@ -2547,7 +2540,7 @@ async function applyOcean(d) {
   try {
     ocean = new oceanModule.OceanEngine(document.getElementById('ocean'), cast, {
       theme: 'dark', fish, fps, still, dim,
-      dpr: detail.dpr, cellScale: detail.cellScale,
+      dpr: detail.dpr, cellScale: detail.cellScale, sharkTints: tints,
       pointer: false,       // a backdrop: no click splashes, no fish fleeing the finger
       contain: true,        // keep whole sharks in frame
       clearCentre: false,   // the cards already provide the calm; the tank fills the screen

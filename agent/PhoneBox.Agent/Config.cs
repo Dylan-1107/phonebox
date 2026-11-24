@@ -160,6 +160,14 @@ public sealed class NightConfig
     public double Brightness { get; set; } = 0.02;
 }
 
+/// <summary>One shark of the ocean backdrop: a species and the colour its skin is tinted with.</summary>
+public sealed class OceanSharkConfig
+{
+    public string Kind { get; set; } = "classic";
+    /// <summary>"#rrggbb"; an invalid or empty value keeps the species' own tint.</summary>
+    public string Color { get; set; } = "";
+}
+
 public sealed class DisplayConfig
 {
     public AppearanceConfig? Appearance { get; set; }
@@ -190,8 +198,9 @@ public sealed class DisplayConfig
     public bool ArtTint { get; set; } = true;
     /// <summary>solid (the theme colour and its glow) or sharks (an animated ASCII ocean on pure black behind the widgets).</summary>
     public string Background { get; set; } = "solid";
-    /// <summary>Which sharks the ocean shows: five (five species, five colours), classic (four), hero (seven) or all (nine).</summary>
-    public string OceanCast { get; set; } = "five";
+    /// <summary>Which sharks the ocean shows, in order: a species and a skin colour each. Edited row by row
+    /// in Settings › Display; a missing colour keeps the species tint.</summary>
+    public List<OceanSharkConfig> OceanSharks { get; set; } = [];
     /// <summary>high (device pixels, sharpest), balanced (1.5x) or battery (1x) raster scale for the ocean.</summary>
     public string OceanDetail { get; set; } = "high";
     /// <summary>Fish in the ocean; 0 leaves only the sharks.</summary>
@@ -661,6 +670,27 @@ public sealed partial class ConfigStore(string path)
     }
 
     /// <summary>Fills in defaults: builds pages from templates, migrates old pages, generates unique ids.</summary>
+    private static readonly string[] OceanSharkKinds = ["classic", "hammerhead", "zebra", "tiger", "greathammer", "mako", "thresher", "nurse", "whale"];
+    private static readonly string[] OceanSharkDefaultKinds = ["whale", "greathammer", "tiger", "thresher", "mako"];
+    private static readonly string[] OceanSharkDefaultColors = ["#a9c7e8", "#d9c8a6", "#d8b0a6", "#a9cdb8", "#bdb2d8"];
+
+    /// <summary>Bounds the shark list: known species only, #rrggbb colours only, 1–8 sharks, and the
+    /// five-shark muted default when the list is missing.</summary>
+    private static List<OceanSharkConfig> NormalizeOceanSharks(List<OceanSharkConfig>? sharks)
+    {
+        var list = (sharks ?? []).Where(s => s is not null).Take(8).ToList();
+        if (list.Count == 0) list = OceanSharkDefaultKinds.Select(k => new OceanSharkConfig { Kind = k }).ToList();
+        for (var i = 0; i < list.Count; i++)
+        {
+            var kind = list[i].Kind?.Trim().ToLowerInvariant();
+            list[i].Kind = OceanSharkKinds.Contains(kind) ? kind! : OceanSharkDefaultKinds[i % OceanSharkDefaultKinds.Length];
+            var color = list[i].Color?.Trim().ToLowerInvariant();
+            list[i].Color = color is { Length: 7 } && color[0] == '#' && color[1..].All(Uri.IsHexDigit)
+                ? color : OceanSharkDefaultColors[i % OceanSharkDefaultColors.Length];
+        }
+        return list;
+    }
+
     private static AgentConfig Normalize(AgentConfig c, IReadOnlySet<string>? staleIds = null)
     {
         c.Weather ??= new();
@@ -686,7 +716,7 @@ public sealed partial class ConfigStore(string path)
         c.Display ??= new();
         c.Display.Appearance?.Normalize();
         c.Display.Background = c.Display.Background is "sharks" ? "sharks" : "solid";
-        c.Display.OceanCast = c.Display.OceanCast is "classic" or "hero" or "all" ? c.Display.OceanCast : "five";
+        c.Display.OceanSharks = NormalizeOceanSharks(c.Display.OceanSharks);
         c.Display.OceanDetail = c.Display.OceanDetail is "balanced" or "battery" ? c.Display.OceanDetail : "high";
         c.Display.OceanFish = Math.Clamp(c.Display.OceanFish, 0, 400);
         c.Display.OceanFps = Math.Clamp(c.Display.OceanFps, 24, 60);
