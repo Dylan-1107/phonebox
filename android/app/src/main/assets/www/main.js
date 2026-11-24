@@ -2470,6 +2470,75 @@ export function tick() {
   setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
 }
 
+// ---------------------------------------------------------------- ASCII ocean backdrop
+// The casts are fixed here (the settings page picks a preset), so a hand-edited config can never ask
+// for a species the renderer does not know.
+const OCEAN_CASTS = Object.freeze({
+  classic: [
+    { kind: 'classic', size: 1 }, { kind: 'classic', size: 0.7 },
+    { kind: 'classic', size: 0.84 }, { kind: 'classic', size: 0.77 },
+  ],
+  hero: [
+    { kind: 'whale', size: 1.05 }, { kind: 'greathammer', size: 0.95 },
+    { kind: 'whale', size: 0.88 }, { kind: 'thresher', size: 0.85 },
+    { kind: 'hammerhead', size: 0.85 }, { kind: 'tiger', size: 0.78 },
+    { kind: 'hammerhead', size: 0.76 },
+  ],
+  all: [
+    { kind: 'whale', size: 1.3 }, { kind: 'greathammer', size: 1.1 },
+    { kind: 'hammerhead', size: 1 }, { kind: 'tiger', size: 0.95 },
+    { kind: 'thresher', size: 0.9 }, { kind: 'classic', size: 0.85 },
+    { kind: 'mako', size: 0.8 }, { kind: 'nurse', size: 0.75 },
+    { kind: 'zebra', size: 0.7 },
+  ],
+});
+let ocean = null, oceanModule = null, oceanKey = '', oceanGen = 0;
+
+function stopOcean() {
+  ocean?.destroy();
+  ocean = null;
+  oceanKey = '';
+}
+
+/**
+ * The ocean is a settings choice, not a widget: applyDisplay() runs every minute, so this must be
+ * idempotent. It sits before the PREVIEW/bridge early return so the editor's live preview and a
+ * desktop browser show it too. The canvas is a fixed layer under #pager (style.css); hiding it for
+ * the night screen also pauses it through the engine's IntersectionObserver.
+ */
+async function applyOcean(d) {
+  const on = d.background === 'sharks';
+  document.body.classList.toggle('ocean', on);
+  if (!on) { stopOcean(); return; }
+  const rawOpacity = d.oceanOpacity == null ? 70 : Number(d.oceanOpacity);
+  const opacity = Math.max(20, Math.min(100, Math.round(Number.isFinite(rawOpacity) ? rawOpacity : 70)));
+  const dim = Math.max(0, Math.min(0.85, 1 - opacity / 100));
+  const cast = OCEAN_CASTS[d.oceanCast] || OCEAN_CASTS.classic;
+  const rawFish = d.oceanFish == null ? 140 : Number(d.oceanFish);
+  const fish = Math.max(0, Math.min(400, Math.round(Number.isFinite(rawFish) ? rawFish : 140)));
+  const rawFps = d.oceanFps == null ? 24 : Number(d.oceanFps);
+  const fps = Math.max(24, Math.min(60, Math.round(Number.isFinite(rawFps) ? rawFps : 24)));
+  const still = d.oceanStill === true;
+  const key = [d.oceanCast, fish, fps, still, dim].join('|');
+  if (ocean && key === oceanKey) return;
+  stopOcean();
+  const gen = ++oceanGen;
+  if (!oceanModule) {
+    try { oceanModule = await import('./ocean.js'); } catch (_) { return; }
+  }
+  // a later call (or a switch back to solid) superseded this one while the module was loading
+  if (gen !== oceanGen || cfg.display?.background !== 'sharks') return;
+  try {
+    ocean = new oceanModule.OceanEngine(document.getElementById('ocean'), cast, {
+      theme: 'dark', fish, fps, still, dim,
+      pointer: false,       // a backdrop: no click splashes, no fish fleeing the finger
+      contain: true,        // keep whole sharks in frame
+      clearCentre: false,   // the cards already provide the calm; the tank fills the screen
+    });
+    oceanKey = key;
+  } catch (_) { ocean = null; }
+}
+
 // ---------------------------------------------------------------- data from the agent
 export function applyDisplay() {
   const d = cfg.display || {};
@@ -2484,6 +2553,7 @@ export function applyDisplay() {
   document.documentElement.style.setProperty('--accent', `rgb(${DEFAULT_AMBIENT})`);
   artTint = d.artTint !== false;
   if (before !== DEFAULT_AMBIENT || !artTint) setAmbient(artTint ? currentArtColor : null);
+  applyOcean(d);
   if (langChanged) { buildLayout(); renderApproval(); }
   renderRulesBtn();
   if (PREVIEW || !bridge) return;

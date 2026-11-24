@@ -710,6 +710,21 @@ nav a.on::before { color: var(--accent); }
           <div class="field" style="margin:0"><label data-i18n="s.display.accent">Accent colour</label><input type="color" data-bind="display.accent" style="width:56px;height:36px;padding:2px"></div>
           <label class="check" style="margin-bottom:8px"><input type="checkbox" data-bind="display.artTint"> <span data-i18n="s.display.artTint">Tint the background with the album art</span></label>
         </div>
+        <div class="field" style="max-width:420px"><label data-i18n="s.display.background">Background</label>
+          <select data-bind="display.background"><option value="solid" data-i18n="s.display.background.solid">Solid colour (theme)</option><option value="sharks" data-i18n="s.display.background.sharks">ASCII ocean (pure black)</option></select>
+          <span class="hint" data-i18n="s.display.backgroundHint">A live ASCII shark tank behind the widgets. Cards, pages and the grid stay exactly as they are.</span></div>
+        <div id="oceanOptions" hidden>
+          <div class="row" style="gap:16px;margin-bottom:8px;align-items:flex-end;flex-wrap:wrap">
+            <div class="field" style="margin:0"><label data-i18n="s.display.oceanCast">Sharks</label>
+              <select data-bind="display.oceanCast"><option value="classic" data-i18n="s.display.oceanCast.classic">Four classics</option><option value="hero" data-i18n="s.display.oceanCast.hero">Seven-species mix</option><option value="all" data-i18n="s.display.oceanCast.all">All nine species</option></select></div>
+            <div class="field" style="margin:0"><label data-i18n="s.display.oceanFish">Fish</label><input type="number" min="0" max="400" data-bind="display.oceanFish" data-type="int" style="width:90px"></div>
+            <div class="field" style="margin:0"><label data-i18n="s.display.oceanFps">Frames per second</label>
+              <select data-bind="display.oceanFps" data-type="int"><option value="24">24</option><option value="30">30</option><option value="45">45</option><option value="60">60</option></select></div>
+            <div class="field" style="margin:0"><label><span data-i18n="s.display.oceanOpacity">Brightness: </span><span id="oov"></span></label><input type="range" min="20" max="100" step="5" data-bind="display.oceanOpacity" data-type="int"></div>
+          </div>
+          <label class="check"><input type="checkbox" data-bind="display.oceanStill"> <span data-i18n="s.display.oceanStill">One still frame instead of animating (saves power)</span></label>
+          <span class="hint" style="display:block;margin-top:2px" data-i18n="s.display.oceanHint">Pure black with no grid, so the screen keeps its OLED black. The ocean pauses with the night screen and while the panel is dimmed.</span>
+        </div>
         <div class="field" style="max-width:420px"><label data-i18n="s.display.orientation">Orientation</label>
           <select data-bind="display.orientation"><option value="landscape" data-i18n="s.display.orientation.landscape">Landscape</option><option value="portrait" data-i18n="s.display.orientation.portrait">Portrait</option><option value="auto" data-i18n="s.display.orientation.auto">Follow the phone</option></select>
           <span class="hint" data-i18n="s.display.orientationHint">You design pages in landscape; in portrait the panel arranges the widgets by itself, top to bottom. Tablets use the same pages, just bigger.</span></div>
@@ -3632,6 +3647,12 @@ function bindLanguage() {
   if ($('displayLangSel')) $('displayLangSel').onchange = (e) => onPick(e.target.value);
 }
 
+function renderOceanOptions() {
+  const d = cfg.display || {};
+  $('oceanOptions').hidden = d.background !== 'sharks';
+  $('oov').textContent = Math.round(d.oceanOpacity ?? 70) + '%';
+}
+
 function bindForm() {
   renderAppearanceSettings();
   renderControlSettings();
@@ -3653,12 +3674,15 @@ function bindForm() {
       $('nbv').textContent = Math.round(cfg.night.brightness * 100) + '%';
       if (p === 'charge.method') renderCharge();
       if (p === 'lan.enabled') renderLanStatus();
+      if (p === 'display.background') renderOceanOptions();
+      if (p === 'display.oceanOpacity') $('oov').textContent = Math.round(parseInt(el.value || '70', 10)) + '%';
       if (p === 'photos.source' || p === 'photos.immichUrl' || p === 'photos.immichKey') renderPhotoSource();
       changed();
     };
   });
   bindCodexBar();
   renderPhotoSource();
+  renderOceanOptions();
   $('nbv').textContent = Math.round(cfg.night.brightness * 100) + '%';
 }
 
@@ -3770,7 +3794,8 @@ function fillDefaults() {
   cfg.pages = fitPages(cfg.pages); cfg.shortcuts ??= []; cfg.rules ??= []; cfg.display ??= {}; cfg.night = { enabled: true, start: '00:30', end: '07:30', brightness: 0.02, ...cfg.night }; cfg.weather ??= {}; cfg.weather.unit ??= 'celsius'; cfg.weather.model ??= ''; cfg.photos ??= { source: 'folder', folder: '', subfolders: true, immichUrl: '', immichKey: '', immichAlbum: '', immichAlbumName: '' }; cfg.lan ??= { enabled: false, port: 8766 }; cfg.updates ??= { auto: true, repo: 'ersinkoc/phonebox' }; cfg.claude ??= { phoneApprovals: true, timeoutSec: 90, onlyWhenAway: false, shareSessionTitles: false, shareConversation: false }; cfg.opencode ??= { phoneApprovals: false, timeoutSec: 90, onlyWhenAway: false, alwaysCountdownSec: 10, watchWsl: false, shareSessionTitles: false, sessions: false };
   cfg.codexBar ??= { providers: ['claude', 'codex', 'antigravity'], rotate: true, pageSize: 2, rotateInterval: 8 };
   for (const [k, v] of Object.entries({ language: 'auto', hour12: false, idleReturnSec: 90, switchCountdownSec: 3, touchGraceSec: 20, minDwellSec: 15, holdMaxMin: 30, keepAwake: true, openOnConnect: true,
-    showSeconds: true, vibrate: true, finishToast: true, volumeKeys: true, artTint: true, nightWhenUnreachable: false, unreachableNightDelayMin: 5, proximityWake: true, orientation: 'landscape', theme: 'default', accent: '#2dd4bf' })) cfg.display[k] ??= v;
+    showSeconds: true, vibrate: true, finishToast: true, volumeKeys: true, artTint: true, nightWhenUnreachable: false, unreachableNightDelayMin: 5, proximityWake: true, orientation: 'landscape', theme: 'default', accent: '#2dd4bf',
+    background: 'solid', oceanCast: 'classic', oceanFish: 140, oceanFps: 24, oceanOpacity: 70, oceanStill: false })) cfg.display[k] ??= v;
   cfg.charge ??= { enabled: false, min: 50, max: 80, method: 'ha' };
   cfg.steam ??= { enabled: false };
 }

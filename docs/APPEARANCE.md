@@ -70,3 +70,29 @@ Supported style values are `default`, `cards`, `flat`, `borderless` and `seamles
 `default`, `sans`, `rounded`, `condensed`, `serif` and `mono`, and `fontScale` is clamped between `50` and `200`.
 Omitted/null properties inherit. Zero and false are explicit choices. Imported numeric values are bounded;
 unknown style or font names are discarded, and appearance does not accept arbitrary CSS.
+
+## Ocean background
+
+Settings › Display › Background can replace the theme's flat colour and glow with an animated ASCII ocean
+(vendored [ascii-sharks](https://github.com/stackedlol/ascii-sharks), MIT). Cards, widget frames, spacing and
+the grid are untouched: the ocean is a fixed canvas layer underneath the pages, so it works with every layout.
+
+The stage is true black and draws no grid lines, so an OLED panel keeps those pixels off. The night screen and
+the idle-dim veil hide the canvas, which also pauses the animation through its IntersectionObserver; page
+switching, rules and the rest of the panel keep working over it. The canvas is rasterised at CSS pixels and kept
+opaque (the brightness is painted inside the canvas, not with CSS `opacity`), because it sits under the
+semi-transparent cards.
+
+| Setting | Values | Default |
+|---|---|---|
+| Background | solid / sharks | solid |
+| Sharks | classic (four) / hero (seven) / all (nine) | classic |
+| Fish | 0–400 | 140 |
+| Frames per second | 24–60 | 24 |
+| Brightness | 20–100 % | 70 |
+| One still frame | on / off | off |
+
+The simulation always steps at 60 Hz; `oceanFps` only throttles painting. On the desk tablet painting costs
+roughly 3 % of a CPU core per frame, so the animated default is 24 fps. `oceanStill` settles the tank and paints
+a single frame instead: near-zero CPU, but no motion. Fish are tinted per species (sardine, anchovy, silverside,
+mackerel, goby) so the school reads as colour over the black water.

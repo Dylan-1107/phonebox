@@ -55,6 +55,25 @@ body::before {
   pointer-events: none;
 }
 
+/* ---------- ASCII ocean backdrop (Settings › Display) ----------
+   A fixed canvas under #pager; z-index must be 0, not -1: html and body paint their own background
+   and would hide a negative-layer child. Nothing else about the pages or cards changes. */
+#ocean {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  display: none;
+  pointer-events: none;
+  background: #000;
+  font-family: "Roboto Mono", ui-monospace, monospace;
+}
+body.ocean { background: #000; }
+body.ocean::before { display: none; }       /* the theme glow would muddy the pure black */
+body.ocean #ocean { display: block; }
+body.night #ocean, body.dimmed #ocean { display: none; }  /* also stops the animation (IntersectionObserver) */
+
 button { font: inherit; color: inherit; background: none; border: 0; }
 .muted { color: var(--muted); }
 .empty { width: 100%; height: 100%; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; white-space: pre-line; padding: 8px; }

@@ -188,6 +188,19 @@ public sealed class DisplayConfig
     public string Accent { get; set; } = "#2dd4bf";
     /// <summary>Tint the background with the album art's colour while music plays.</summary>
     public bool ArtTint { get; set; } = true;
+    /// <summary>solid (the theme colour and its glow) or sharks (an animated ASCII ocean on pure black behind the widgets).</summary>
+    public string Background { get; set; } = "solid";
+    /// <summary>Which sharks the ocean shows: classic (four), hero (seven) or all (nine species).</summary>
+    public string OceanCast { get; set; } = "classic";
+    /// <summary>Fish in the ocean; 0 leaves only the sharks.</summary>
+    public int OceanFish { get; set; } = 140;
+    /// <summary>Frames per second the ocean renders (24–60); the simulation always steps at 60 Hz. 24 is the
+    /// default because painting is ~3% of a CPU core per frame on the desk tablet.</summary>
+    public int OceanFps { get; set; } = 24;
+    /// <summary>Backdrop brightness: a black veil painted over the ocean (not a CSS opacity), 20–100 %.</summary>
+    public int OceanOpacity { get; set; } = 70;
+    /// <summary>Draw one settled frame and stop, instead of animating (saves power on a weak tablet).</summary>
+    public bool OceanStill { get; set; }
     /// <summary>Screen brightness follows the room (the phone's light sensor).</summary>
     public bool AutoBrightness { get; set; }
     /// <summary>Show the night screen whenever the room is dark, not only at night.</summary>
@@ -670,6 +683,11 @@ public sealed partial class ConfigStore(string path)
             ? Cap(plexToken, 256) : null;
         c.Display ??= new();
         c.Display.Appearance?.Normalize();
+        c.Display.Background = c.Display.Background is "sharks" ? "sharks" : "solid";
+        c.Display.OceanCast = c.Display.OceanCast is "hero" or "all" ? c.Display.OceanCast : "classic";
+        c.Display.OceanFish = Math.Clamp(c.Display.OceanFish, 0, 400);
+        c.Display.OceanFps = Math.Clamp(c.Display.OceanFps, 24, 60);
+        c.Display.OceanOpacity = Math.Clamp(c.Display.OceanOpacity, 20, 100);
         c.Display.Hour12 = Hour12JsonConverter.Normalize(c.Display.Hour12);
         c.Display.PageBar = c.Display.PageBar is "dots" or "auto" or "bar" ? c.Display.PageBar : "dots";
         c.Display.PageBarSide = c.Display.PageBarSide is "bottom" or "left" or "right" ? c.Display.PageBarSide : "bottom";
