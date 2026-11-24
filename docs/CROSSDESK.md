@@ -35,15 +35,18 @@ CrossDesk 官方网页版使用 9 位 ID + 密码连接，握手依赖官方信�
 
 改完「仅允许可信设备控制」要重启 CrossDesk 再连。2026-11-24 实测：只在界面里关掉并保存后，新会话画面正常、`直连` 正常，但控制端鼠标键盘完全没反应（PC 光标不动、打字无字符）；被控端只记录一次 `Remote pointer input received`，之后没有任何输入结果日志。原因是 Windows 版 CrossDesk 由 GUI 加 `crossdesk_service` 组成，输入注入走服务端的受控端名单，服务仍按旧的可信设备策略丢弃了输入。完全退出并重新启动 CrossDesk 后，同一套网页客户端立刻恢复：远程滑动把光标从 (646,951) 移到 (1171,1066)，远程 Esc 关掉了电脑上的对话框。再次修改这个开关后同样要重启。
 
-**输入用一阵子突然失效：用管理员权限运行被控端**
+**输入失效（鼠标键盘没反应、画面正常）：普通权限 + 关掉隐私屏**
 
-同一天又复现了一次更隐蔽的失效：画面、`直连`、声音都正常，鼠标点了不动、键盘打不出字，重连也没用，只有重启 CrossDesk 能恢复，过几分钟可能再次失效。
+症状：`直连`、画面、声音都正常，但控制端点击和打字都没反应；重连无效。被控端日志只有一次 `Remote pointer input received`（该行每个远端 ID 只记一次），没有输入结果错误。
 
-电脑端日志给出原因：`windows_service_runtime.cpp: Local Windows service temporarily unavailable: error=pipe_unavailable, code=5`，`crossdesk_service.exe --ping` 也返回 `{"ok":false,"error":"pipe_unavailable","code":5}`，即命名管道不可用或拒绝访问（服务以 SYSTEM 运行，GUI 以普通权限运行）。普通权限的被控端会轮询服务状态，一旦认为服务可用，就把全部鼠标键盘输入交给这个管道，`PreferUserDesktopInput()` 因此返回 false；管道实际不通时输入被静默丢弃，画面不受影响。以管理员身份运行 `CrossDesk.exe` 后 `process_elevated=true`，输入固定走本机桌面注入，不再依赖该管道。实测同一会话里 `pipe_unavailable` 依旧出现，但远程点击能把电脑光标从 (1401,535) 移到 (1442,495)，切换站点标签再回来也仍然有效。
+2026-11-24 在这台电脑上验证出的两个必要条件，缺一个输入就静默失败：
 
-因此这台机器上把 `CrossDesk.exe` 设为始终以管理员运行：HKCU `Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers` 下该 exe 路径的值为 `~ RUNASADMIN`（删除该值即可还原，启动时会弹一次 UAC）。检查是否真的以管理员运行，可比较进程令牌；仅看用户名不够。
+- **不要用管理员权限运行 `CrossDesk.exe`。** 提权后 `process_elevated=true`，`PreferUserDesktopInput()` 固定选本机桌面注入，而网页/信令类会话（非 `lan/` 直连）根本没有创建鼠标控制器，`SendMouseCommand` 直接返回 false，输入被丢掉且不报错。之前把它设成 `~ RUNASADMIN` 反而让所有输入失效，该注册表值已删除。判断是否提权要看进程令牌，不能只看用户名。
+- **关掉「设置 › 常规 › 隐私保护 › 被连接时开启隐私屏」。** 开启时被控端切到隐私桌面，键鼠必须经 secure-input 助手注入，而这条链路在当前机器上不可用：日志反复出现 `Local Windows service temporarily unavailable: error=pipe_unavailable, code=5`，`crossdesk_service.exe --ping` 也返回 `{"ok":false,"error":"pipe_unavailable","code":5}`，助手进程在未锁屏时根本没有管道实例。关掉后输入回到普通桌面的注入路径。
 
-另外修正一处：网页会话断开同样会触发「连接断开后锁屏」。2026-11-24 15:37 在控制端点「断开连接」后，被控端日志立即出现 `Requested screen lock after last controller disconnected` 与 `session-lock` 事件，电脑真的锁屏了。不想被锁就先关掉 `lock_on_disconnect`。
+关掉隐私屏、以普通权限重启 CrossDesk 后实测恢复：先用 `SetCursorPos` 把把电脑光标播到 (311,337) 这种用户不会碰的位置，再从平板远程点一下，光标变成 (1044,955)，说明注入生效；同一会话里远程操作还点开了电脑上的终端窗口。恢复步骤固定为「退出 CrossDesk → 普通启动 → 重连」，重连而不重启无效。代价是被控端显示器不再遮挡，隐私屏功能随之关闭。
+
+另外顺带确认：网页会话断开同样会触发「连接断开后锁屏」。2026-11-24 15:37 在控制端点「断开连接」后，被控端日志出现 `Requested screen lock after last controller disconnected` 与 `session-lock` 事件，电脑真的锁屏了。不想被锁就先关掉 `lock_on_disconnect`。
 
 **PhoneBox 的 WebView 设置**
 
