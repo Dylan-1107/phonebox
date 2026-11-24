@@ -480,10 +480,10 @@ export class AsciiRenderer {
   private sharkKey = new Uint32Array(0);
   private sharkDepth = new Float32Array(0);
   private sharkKind = new Uint8Array(0);
-  /** Per-cell colour index into sharkTints; NO_TINT falls back to the species tint. */
+  /** Per-cell colour index into sharkColors; NO_TINT falls back to the species tint. */
   private sharkTint = new Uint8Array(0);
-  /** PhoneBox: custom skin tints supplied by the host, indexed by the shark's id - 1. */
-  sharkTints: ([number, number, number] | null)[] = [];
+  /** PhoneBox: absolute skin colours supplied by the host, indexed by the shark's id - 1. */
+  sharkColors: ([number, number, number] | null)[] = [];
   /** Cells darkened by a shark's shadow on the seabed. */
   private sharkShadow = new Uint8Array(0);
   private spine = new Float32Array(SHARK_NODES * 2);
@@ -935,7 +935,7 @@ export class AsciiRenderer {
       this.shape = SHAPES[sh.kind];
       this.sharkId = sh.id;
       const kindIndex = KINDS.indexOf(sh.kind);
-      const tintIndex = sh.id - 1 < this.sharkTints.length ? sh.id - 1 : NO_TINT;
+      const tintIndex = sh.id - 1 < this.sharkColors.length ? sh.id - 1 : NO_TINT;
 
       // Travelling body wave, growing toward the tail.
       for (let k = 0; k < N; k++) {
@@ -1030,6 +1030,13 @@ export class AsciiRenderer {
     }
   }
 
+  /** PhoneBox: one picked colour, scaled by brightness. It never leaves its hue, so the colour picker
+   * controls the whole shark instead of only the lit cells. */
+  private baseShade(base: [number, number, number], k: number) {
+    const c = (v: number) => Math.max(0, Math.min(255, Math.round(v * k)));
+    return `rgb(${c(base[0])},${c(base[1])},${c(base[2])})`;
+  }
+
   private drawSharks(t: number) {
     const { ctx, cols, rows, cw, ch, sharkFlag, sharkShade, sharkKey, sharkDepth, sharkKind, sharkTint, palette, stage } = this;
     const n = cols * rows;
@@ -1043,7 +1050,8 @@ export class AsciiRenderer {
       const key = sharkKey[i];
       const shade = sharkShade[i];
       const dim = 0.7 + 0.3 * sharkDepth[i];
-      const [tr, tg, tb] = (sharkTint[i] !== NO_TINT ? this.sharkTints[sharkTint[i]] : null) ?? SHAPES[KINDS[sharkKind[i]]].tint;
+      const base = sharkTint[i] !== NO_TINT ? this.sharkColors[sharkTint[i]] : null;
+      const [tr, tg, tb] = base ?? SHAPES[KINDS[sharkKind[i]]].tint;
 
       // Colours re-roll on a staggered clock so the hide shimmers.
       const tick = Math.floor(t * 2.4 + (key % 997) / 97);
@@ -1053,8 +1061,9 @@ export class AsciiRenderer {
         // Soft, anti-aliased silhouette: no block, just a light glyph.
         const set = shade >= 0.5 ? EDGE_HEAVY : EDGE_LIGHT;
         const g = (70 + shade * 80) * dim;
-        ctx.fillStyle =
-          stage === "full" && palette.accents.length && roll < 0.07
+        ctx.fillStyle = base
+          ? this.baseShade(base, 0.55 + 0.45 * (g / 255))
+          : stage === "full" && palette.accents.length && roll < 0.07
             ? palette.accents[key % palette.accents.length]
             : palette.tone(g, tr, tg, tb);
         ctx.fillText(set[(key >>> 8) % set.length], x + cw / 2, y + ch / 2 + 1);
@@ -1091,12 +1100,22 @@ export class AsciiRenderer {
       if (stage === "silhouette") level = 150;
       level *= dim;
       // Tinted per species; the classic tint is a cool blue-grey, like a back seen through deep water.
-      ctx.fillStyle = palette.tone(level, tr, tg, tb);
+      // A picked colour replaces the whole skin: every block is that hue at some brightness.
+      ctx.fillStyle = base
+        ? this.baseShade(base, 0.45 + 0.55 * clamp(level / 255, 0, 1))
+        : palette.tone(level, tr, tg, tb);
       ctx.fillRect(x + 1, y + 1, cw - 1, ch - 1);
       if (stage !== "full") continue;
 
       let color: string;
-      if (flag === FLAG_EYE) color = palette.eye;
+      if (base) {
+        // Glyphs and markings are shades of the same colour, so no foreign white or accent flecks.
+        if (flag === FLAG_EYE) color = this.baseShade(base, 0.18);
+        else if (flag === FLAG_MARK) color = this.baseShade(base, 0.32);
+        else if (flag === FLAG_SPOT || flag === FLAG_FLECK) color = this.baseShade(base, 1.2);
+        else if (flag === FLAG_MOUTH) color = this.baseShade(base, 0.24);
+        else color = this.baseShade(base, shade > 0.55 ? 0.3 : 0.42);
+      } else if (flag === FLAG_EYE) color = palette.eye;
       else if (flag === FLAG_MARK) color = palette.tone(70, tr, tg, tb);
       else if (flag === FLAG_SPOT || flag === FLAG_FLECK) color = palette.spot;
       else if (flag === FLAG_MOUTH) color = palette.mouth;

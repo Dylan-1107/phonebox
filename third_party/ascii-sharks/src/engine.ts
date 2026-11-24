@@ -28,8 +28,8 @@ export interface OceanOptions {
   cellScale?: number;
   /** PhoneBox: raster scale (1–2). 2 renders at device pixels (sharp); 1 halves the pixels. */
   dpr?: number;
-  /** PhoneBox: custom skin tints per shark (index = position in the cast); null keeps the species tint. */
-  sharkTints?: ([number, number, number] | null)[];
+  /** PhoneBox: absolute skin colours per shark (index = position in the cast); null keeps the species tint. */
+  sharkColors?: ([number, number, number] | null)[];
   /** Run a Game of Life on the same cells, seeded by this function on every resize. */
   life?: (life: Life) => void;
 }
@@ -64,7 +64,7 @@ export class OceanEngine {
     this.renderer.setTheme(options.theme ?? "dark");
     this.renderer.dim = Math.max(0, Math.min(0.85, options.dim ?? 0));
     this.renderer.cellScale = Math.max(0.6, Math.min(2, options.cellScale ?? 1));
-    this.renderer.sharkTints = options.sharkTints ?? [];
+    this.renderer.sharkColors = options.sharkColors ?? [];
     this.renderer.stage = options.stage ?? "full";
     if (options.life) this.renderer.life = new Life(options.life);
     this.still = options.still ?? false;

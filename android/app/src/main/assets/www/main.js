@@ -2483,12 +2483,13 @@ const DEFAULT_OCEAN_SHARKS = Object.freeze([
 ]);
 const OCEAN_SIZES = [1, 0.95, 0.88, 0.9, 0.78, 0.84, 0.8, 0.76];
 
-/** "#a9c7e8" → the r/g/b multipliers the renderer tints the grey skin with. */
-function oceanTint(hex) {
+/** "#a9c7e8" → the absolute skin colour [r, g, b]. The renderer shades it; it does not multiply a
+ * species tint, so the whole shark follows the picked colour. */
+function oceanColor(hex) {
   const m = /^#([0-9a-f]{6})$/i.exec(String(hex || ''));
   if (!m) return null;
   const n = parseInt(m[1], 16);
-  return [((n >> 16) & 255) / 255 * 1.15, ((n >> 8) & 255) / 255 * 1.15, (n & 255) / 255 * 1.15];
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 // How many canvas pixels per CSS pixel the ocean rasterises at, and how fine its glyph grid is.
 // High is a 1:1 physical image with ~160 columns across the panel; balanced halves the pixels;
@@ -2521,7 +2522,7 @@ async function applyOcean(d) {
   const dim = Math.max(0, Math.min(0.85, 1 - opacity / 100));
   const list = (Array.isArray(d.oceanSharks) && d.oceanSharks.length ? d.oceanSharks : DEFAULT_OCEAN_SHARKS).slice(0, 8);
   const cast = list.map((s, i) => ({ kind: OCEAN_KINDS.includes(s?.kind) ? s.kind : 'classic', size: OCEAN_SIZES[i] || 0.72 }));
-  const tints = list.map((s) => oceanTint(s?.color));
+  const colors = list.map((s) => oceanColor(s?.color));
   const rawFish = d.oceanFish == null ? 140 : Number(d.oceanFish);
   const fish = Math.max(0, Math.min(400, Math.round(Number.isFinite(rawFish) ? rawFish : 140)));
   const rawFps = d.oceanFps == null ? 24 : Number(d.oceanFps);
@@ -2540,7 +2541,7 @@ async function applyOcean(d) {
   try {
     ocean = new oceanModule.OceanEngine(document.getElementById('ocean'), cast, {
       theme: 'dark', fish, fps, still, dim,
-      dpr: detail.dpr, cellScale: detail.cellScale, sharkTints: tints,
+      dpr: detail.dpr, cellScale: detail.cellScale, sharkColors: colors,
       pointer: false,       // a backdrop: no click splashes, no fish fleeing the finger
       contain: true,        // keep whole sharks in frame
       clearCentre: false,   // the cards already provide the calm; the tank fills the screen

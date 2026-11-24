@@ -99,6 +99,7 @@ and a still frame is close to it. `oceanStill` settles the tank and paints a sin
 Each shark is edited on its own row in Settings › Display: a species (classic, hammerhead, zebra, tiger, great
 hammerhead, mako, thresher, nurse or whale) and a colour picker. The list is stored as
 `display.oceanSharks: [{ "kind": "whale", "color": "#a9c7e8" }, …]`; a missing or invalid colour keeps the
-species' own tint. The defaults are deliberately muted pastels, and the Brightness slider dims the whole ocean.
-Fish are tinted per species (sardine, anchovy, silverside, mackerel, goby) so the school reads as colour over the
-black water.
+species' own tint. A picked colour is the shark's skin colour: body blocks, fins, markings, the eye and the
+glyphs are all shades of that one colour, so it controls the whole animal instead of a lit patch. The defaults
+are deliberately muted pastels, and the Brightness slider dims the whole ocean. Fish are tinted per species
+(sardine, anchovy, silverside, mackerel, goby) so the school reads as colour over the black water.
