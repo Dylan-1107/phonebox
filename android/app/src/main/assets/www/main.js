@@ -2020,7 +2020,21 @@ function hideWeb() {
   webShown = '';
   try { bridge && bridge.webPage('hide', '', '', 0, 0, 0, 0); } catch (_) {}
 }
-/** The app's view follows the card: on every scroll frame, so the site stays inside its frame while the pages move. */
+/** The native site sits above the panel: keep it out of the dots or dock's actual touch area. */
+function webBounds(r) {
+  let { left, top, right, bottom } = r;
+  const dots = $('dots'), bar = dots.getBoundingClientRect();
+  if (pages.length > 1 && bar.width && bar.height && bar.left < right && bar.right > left && bar.top < bottom && bar.bottom > top) {
+    if (dots.classList.contains('pb-vertical')) {
+      if (document.body.classList.contains('pagebar-right')) right = Math.min(right, bar.left);
+      else left = Math.max(left, bar.right);
+    } else if (document.body.classList.contains('controls-top')) top = Math.max(top, bar.bottom);
+    else bottom = Math.min(bottom, bar.top);
+  }
+  return { left, top, width: right - left, height: bottom - top };
+}
+
+/** The app's view follows the card on every scroll frame, leaving the page navigation clear. */
 export function syncWebPage() {
   if (!bridge || !bridge.webPage) return;
   const p = pages[curPage];
@@ -2030,10 +2044,12 @@ export function syncWebPage() {
   const r = slot.body.getBoundingClientRect();
   if (!r.width || !r.height) return;
   if (r.right <= 0 || r.left >= window.innerWidth) { hideWeb(); return; } // the card slid away
-  const key = [site.url, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)].join('|');
+  const area = webBounds(r);
+  if (area.width <= 0 || area.height <= 0) { hideWeb(); return; }
+  const key = [site.url, Math.round(area.left), Math.round(area.top), Math.round(area.width), Math.round(area.height)].join('|');
   if (key === webShown) return;
   webShown = key;
-  try { bridge.webPage('show', site.url, p.id || p.title, r.left, r.top, r.width, r.height); } catch (_) {}
+  try { bridge.webPage('show', site.url, p.id || p.title, area.left, area.top, area.width, area.height); } catch (_) {}
 }
 function queueWebPage() {
   if (webRaf) return;
@@ -2120,6 +2136,8 @@ export function applyPageBar() {
   $('dots').classList.toggle('pb-vertical', shown && side !== 'bottom');
   // a docked bar changes the size of the pages: keep the current one in place
   if (reflow) requestAnimationFrame(() => goPage(curPage, true));
+  // the site WebView is a native layer above this page: resize it when the bar takes or gives back room
+  if (webSlots.size) queueWebPage();
 }
 /** Whether the dots show as a page bar down the left or right edge (slides then go up and down). */
 const barVertical = () => $('dots').classList.contains('pagebar') && $('dots').classList.contains('pb-vertical');
