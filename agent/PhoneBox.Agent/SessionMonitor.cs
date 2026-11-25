@@ -50,6 +50,8 @@ public sealed partial class SessionMonitor(ILogger<SessionMonitor> log, ConfigSt
     public IReadOnlyList<AgentSession> Snapshot()
     {
         var all = _sessions;
+        if (config?.Get().WorkBuddy.Sessions != true)
+            all = all.Where(s => s.Tool != "workbuddy").ToList();
         if (!all.Any(s => s.Title is not null)) return all;
         var claude = ShareTitles;
         var opencode = config?.Get().OpenCode.ShareSessionTitles ?? false;
@@ -78,6 +80,11 @@ public sealed partial class SessionMonitor(ILogger<SessionMonitor> log, ConfigSt
             try { list.AddRange(ReadCodex()); } catch (Exception ex) { log.LogDebug("codex sessions: {Msg}", ex.Message); }
             // ZCode keeps its sessions in a SQLite database; read-only, and only when it has one.
             try { list.AddRange(ReadZCode()); } catch (Exception ex) { log.LogDebug("zcode sessions: {Msg}", ex.Message); }
+            if (config?.Get().WorkBuddy.Sessions == true)
+            {
+                try { list.AddRange(ReadWorkBuddy()); }
+                catch (Exception ex) { log.LogDebug("workbuddy sessions: {Kind}", ex.GetType().Name); }
+            }
             // OpenCode sessions are off until Settings › General › "Show OpenCode sessions" is enabled; while off,
             // the service is not read at all — not even the every-2-seconds GET.
             if (config?.Get().OpenCode.Sessions == true)
@@ -110,6 +117,41 @@ public sealed partial class SessionMonitor(ILogger<SessionMonitor> log, ConfigSt
         }
     }
 
+    /// <summary>Reads WorkBuddy's live status files. No transcript or database is opened.</summary>
+    internal static IEnumerable<AgentSession> ReadWorkBuddy(string? homeDir = null, Func<int, bool>? isAlive = null, long? nowMs = null)
+    {
+        var home = homeDir ?? Home;
+        var now = nowMs ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var alive = isAlive ?? Alive;
+        var folder = Path.Combine(home, ".workbuddy", "sessions");
+        if (!Directory.Exists(folder)) yield break;
+        foreach (var file in Directory.EnumerateFiles(folder, "*.json"))
+        {
+            AgentSession? session = null;
+            try
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllText(file));
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("pid", out var id) || !id.TryGetInt32(out var pid) || pid <= 0 || !alive(pid))
+                    continue;
+                if (Str(root, "kind") == "prewarm") continue;
+                var sessionId = Str(root, "sessionId");
+                var cwd = Str(root, "cwd") ?? "";
+                var project = WorkBuddyNames.For(cwd, home) ?? Path.GetFileName(cwd.TrimEnd('\\', '/'));
+                var started = Long(root, "startedAt") ?? 0;
+                var heartbeat = Long(root, "lastHeartbeat") ?? Long(root, "updatedAt") ?? started;
+                var recent = heartbeat > 0 && now >= heartbeat && now - heartbeat < 90_000;
+                session = new AgentSession(
+                    Id: "workbuddy:" + (string.IsNullOrWhiteSpace(sessionId) ? pid.ToString() : sessionId),
+                    Tool: "workbuddy", Name: project, Project: project, Status: recent ? "busy" : "idle",
+                    WaitingFor: null, Since: Long(root, "updatedAt") ?? heartbeat, StartedAt: started, Pid: pid,
+                    Model: Str(root, "model"));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
+            { /* The status file can be replaced between poll ticks. */ }
+            if (session is not null) yield return session;
+        }
+    }
     // CodexBar runs `claude` in <Application Support or temp>/CodexBar/ClaudeProbe to read usage.
     // Match only that exact directory so real projects that merely contain "CodexBar" stay visible.
     internal static bool IsCodexBarProbe(string cwd) =>

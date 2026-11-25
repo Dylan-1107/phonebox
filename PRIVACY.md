@@ -103,6 +103,12 @@ the Android app removes everything on the phone.
 The Water intake widget stores the current local day's total and the next reminder in panel storage on that device.
 It sends no intake data to the desktop agent or an external service.
 
+WorkBuddy sessions and phone approvals are off by default. When enabled, WorkBuddy session cards use local status files and
+workspace names. When an enabled AI sessions widget allows WorkBuddy phone approvals, the hook sends pending
+prompt details (session ID, workspace, working directory, tool, action details and any description) to the local
+agent. The paired phone receives the prompt and replies over USB or pinned TLS over Wi-Fi. Turn off **Ask on
+the phone** in WorkBuddy's settings section, disable the widget's approval option or remove the hook to stop it.
+
 ## Connections made by default
 
 Each of these servers sees your IP address, like any web request. PhoneBox sends none of them an identifier for you

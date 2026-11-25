@@ -936,6 +936,8 @@
     if (path === '/api/update') return json({ status: { agentVersion: VERSION, appVersion: VERSION, latest: VERSION, releaseUrl: 'https://github.com/ersinkoc/phonebox/releases/latest', agentUpdate: false, appUpdate: false,
       lastCheck: now() - 3600e3, state: 'idle', error: null }, auto: (await config()).updates?.auto !== false, installed: true });
     if (path === '/api/claude/hook') return json({ installed: false, path: '~/.claude/settings.json' });
+    if (path === '/api/codex/hook') return json({ installed: false, path: '~/.codex/hooks.json' });
+    if (path === '/api/workbuddy/hook') return json({ installed: false, path: '~/.workbuddy/settings.json' });
     if (method !== 'GET') return json({ ok: true });
     return json({ error: 'not in the demo' }, 404);
   }

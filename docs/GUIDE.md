@@ -279,10 +279,20 @@ permission prompts** and press *Install hook*: PhoneBox adds a `PermissionReques
 time, the hook returns no decision and Claude Code asks in the terminal as usual. Optionally only when you have been
 away from the keyboard for a minute.
 
-WorkBuddy speaks the same hook protocol. Add the same `PermissionRequest` entry to `~/.workbuddy/settings.json` by
-hand: *Install hook* writes to `~/.claude/settings.json` only. WorkBuddy keeps its sessions in `~/.workbuddy`, so the
-card takes the project name from the workspace name WorkBuddy stores
-(`~/.workbuddy/workspace-display-names.json`) instead of the folder name.
+WorkBuddy has its own controls under **Settings › General › AI coding agent permission prompts**.
+Turn on **Ask on the phone** in the WorkBuddy section. Enable **Allow WorkBuddy approvals on the phone**
+in an AI sessions widget on an enabled page. Save the settings, then click **Install hook** in the WorkBuddy
+section. The installer uses the saved timeout and writes a `PermissionRequest` hook to `~/.workbuddy/settings.json`
+and keeps the existing settings. Restart WorkBuddy after installation and use its default permission mode to see prompts.
+To avoid duplicate prompts, remove any old PhoneBox entry you copied manually before installing this one.
+The event provides the session ID, working directory, tool name and tool input. The phone returns Allow or Deny.
+If the phone does not answer, WorkBuddy keeps its own approval flow.
+[Tencent hook reference](https://cloud.tencent.com/document/product/1831/137030#permissionrequest).
+
+**Show WorkBuddy sessions** is a separate switch. It reads the live process status files under `~/.workbuddy/sessions`
+and displays the workspace name and activity. No chat titles or conversation text are read from those files.
+
+工作区名称优先读取 `~/.workbuddy/workspace-display-names.json`；没有映射时显示目录名。
 
 OpenCode needs no hook: prompts are off until you turn them on — press the **Ask on the phone** switch under
 **Settings › General › AI coding agent permission prompts** (or set `"phoneApprovals": true` in the `opencode` section
