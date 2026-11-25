@@ -1,6 +1,7 @@
-import { $, API, D, LEVEL_COLOR, LOCALE, mediaHtml, METRICS, PANEL_HEADERS, PREVIEW, Q_STYLE, S_ORDER, ago, api, averageColor, buildLayout, buzz, cfg, chime, cfgVersion, chart, color, cssVar, currentProcessesSort, emit, fillIcon, fmtClock, fmtDur, fmtHM, fmtMem, fmtReset, fmtTime, fmtValue, gotoProcesses, gpuMem, gpusOf, h, en, haptic, hasProcessesPage, hist, hour12, icon, keyButton, setKeyFace, labelled, levelOf, media, metricText, online, openSheet, paceInfo, pad, prRow, pushView, quotaProviders, r1, registerProcessesSorter, renderStatus, ringSvg, setArtColor, configMark, configReadSince, localWriteStored, setMediaState, setVolDragging, shortDur, shortGpu, store, t, tick, toast, volDragging, wxBlock, wxDeg, wxIcon, emo, rich, tp, tpv, quotaText, pages, curPage, gotoPageRef } from '../main.js';
+import { $, API, D, LEVEL_COLOR, LOCALE, mediaHtml, METRICS, PANEL_HEADERS, PREVIEW, Q_STYLE, S_ORDER, ago, api, averageColor, buildLayout, buzz, cfg, chime, cfgVersion, chart, color, cssVar, currentProcessesSort, emit, fillIcon, fmtClock, fmtDur, fmtHM, fmtMem, fmtReset, fmtTime, fmtValue, gotoProcesses, gpuMem, gpuOf, gpusOf, hardwareItems, hardwareReading, hardwareStatus, sensorName, sensorNumber, sensorPower, h, en, haptic, hasProcessesPage, hist, hour12, icon, keyButton, setKeyFace, labelled, levelOf, media, metricText, online, openSheet, paceInfo, pad, prRow, pushView, quotaProviders, r1, registerProcessesSorter, renderStatus, ringSvg, setArtColor, configMark, configReadSince, localWriteStored, setMediaState, setVolDragging, shortDur, shortGpu, store, t, tick, toast, volDragging, wxBlock, wxDeg, wxIcon, emo, rich, tp, tpv, quotaText, pages, curPage, gotoPageRef } from '../main.js';
 import { W } from '../registry.js';
 import { invalidateDeckState } from './controls.js';
+import { hardwareIcon, hardwareValues } from './helpers.js';
 
 function bindProcessLink(box, sortTarget) {
   if (!hasProcessesPage()) return;
@@ -10,6 +11,24 @@ function bindProcessLink(box, sortTarget) {
     haptic();
     gotoProcesses(sortTarget);
   });
+}
+
+const HARDWARE_SOURCE = { lhm: 'LibreHardwareMonitor', windows: 'Windows', 'windows-storage': 'Windows', smart: 'SMART', sysfs: 'sysfs' };
+const hardwareSource = (source) => sensorName(source).split('+').map((s) => Object.prototype.hasOwnProperty.call(HARDWARE_SOURCE, s) ? HARDWARE_SOURCE[s] : s).join(' + ');
+
+function metricHardwareValues(kind, metric, state) {
+  const reading = metric.hardware(state), values = hardwareValues(kind, reading, hardwareStatus(state.pc, kind));
+  const g = kind === 'gpu' ? gpuOf(state) : null;
+  // 没有传感器的 GPU 仍有有用的内存和型号信息；保留原有回退显示，不虚构读数。
+  if (g && typeof g === 'object' && !Array.isArray(g) && !sensorNumber(reading.temp) && !sensorPower(reading.power) && !sensorPower(reading.powerPct)) {
+    const fallback = metric.sub?.(state);
+    if (fallback) {
+      values.append(h('span', 'hw-fallback', fallback));
+      values.title += ` · ${fallback}`;
+      values.setAttribute('aria-label', values.title);
+    }
+  }
+  return values;
 }
 
 // ================================================================= widgets
@@ -293,25 +312,36 @@ W.media = {
 W.stat = {
   needs: ['state'],
   create(box, { o }) {
-    const m = METRICS[o.metric] || METRICS.cpu;
+    const metric = Object.prototype.hasOwnProperty.call(METRICS, o.metric) ? o.metric : 'cpu', m = METRICS[metric];
+    const kind = m.hardware ? metric : null;
+    box.dataset.metric = metric;
+    if (kind) box.classList.add('hardware-stat');
     const c = color(m.color);
     box.style.setProperty('--c', c);
     const canvas = h('canvas');
     const lbl = h('div', 't-label', tp(m.label));
     const val = h('b', null, '—'), unit = h('small'), sub = h('div', 't-sub', ' ');
+    const extra = kind === 'ram' ? h('div', 't-extra') : null;
     box.append(canvas, lbl, h('div', 't-val', val, unit), sub);
-    if (o.metric === 'cpu' || o.metric === 'ram') bindProcessLink(box, o.metric === 'cpu' ? 'cpu' : 'mem');
+    if (extra) box.append(extra);
+    if (kind === 'cpu' || kind === 'ram') bindProcessLink(box, kind === 'cpu' ? 'cpu' : 'mem');
     return {
       update() {
-        const s = D.state;
-        if (!s) return;
+        if (!D.state && !kind) return;
+        const s = D.state || {}, missing = hardwareStatus(s.pc, kind);
         const [v, u] = metricText(m, s);
         val.textContent = v;
         unit.textContent = u;
-        const pctVal = m.pct?.(s);
-        lbl.textContent = pctVal != null && m.label === 'RAM' ? `RAM (${Math.round(pctVal)}%)` : tp(m.label);
-        sub.textContent = m.sub?.(s) || ' ';
-        chart(canvas, [{ data: hist[m.hist || o.metric] || hist.cpu, color: c, max: m.max(s) }]);
+        const pctVal = m.pct?.(s), label = sensorNumber(pctVal) && m.label === 'RAM' ? `RAM (${Math.round(pctVal)}%)` : tp(m.label);
+        if (kind) lbl.replaceChildren(icon(hardwareIcon(kind), 'hw-icon'), label);
+        else lbl.textContent = label;
+        if (kind) lbl.title = m.title?.(s) || '';
+        if (kind && kind !== 'ram') sub.replaceChildren(metricHardwareValues(kind, m, s));
+        else sub.textContent = m.sub?.(s) || ' ';
+        // 首页保留已用量/总量这一行；内存与物理存储设备共用其下方现有的小型信息区。
+        if (extra) extra.replaceChildren(hardwareValues('ram', m.hardware(s), missing, true),
+          hardwareValues('storage', hardwareReading(hardwareItems(s.pc?.temperatures?.storage)), missing, true));
+        chart(canvas, [{ data: hist[m.hist || metric] || hist.cpu, color: c, max: m.max(s) }]);
       },
     };
   },
@@ -320,7 +350,9 @@ W.stat = {
 W.gauge = {
   needs: ['state'],
   create(box, { o }) {
-    const m = METRICS[o.metric] || METRICS.cpu;
+    const metric = Object.prototype.hasOwnProperty.call(METRICS, o.metric) ? o.metric : 'cpu', m = METRICS[metric];
+    const kind = metric === 'gpu' ? metric : null;
+    box.dataset.metric = metric;
     box.style.setProperty('--q', color(m.color));
     const dial = h('div', 'g-dial'), pct = h('div', 'g-val'), sub = h('div', 'g-sub');
     box.append(dial, h('div', 'g-label', tp(m.label)), sub);
@@ -329,8 +361,8 @@ W.gauge = {
     let svg = null;
     return {
       update() {
-        const s = D.state;
-        if (!s) return;
+        if (!D.state && !kind) return;
+        const s = D.state || {};
         const raw = m.pct ? m.pct(s) : m.val(s);
         const p = raw == null ? 0 : (raw / (m.pct ? 100 : m.max(s))) * 100;
         const warn = m.hot ? (raw > m.hot[1] ? '#ef4444' : raw > m.hot[0] ? '#f59e0b' : '') : (p >= 95 ? '#ef4444' : p >= 85 ? '#f59e0b' : '');
@@ -340,7 +372,8 @@ W.gauge = {
         svg = dial.firstElementChild;
         const [v, u] = metricText(m, s);
         pct.replaceChildren(v, h('small', null, u));
-        sub.textContent = m.sub?.(s) || '';
+        if (kind) sub.replaceChildren(metricHardwareValues(kind, m, s));
+        else sub.textContent = m.sub?.(s) || '';
       },
     };
   },
@@ -353,21 +386,27 @@ W.chart = {
     const keys = (Array.isArray(o.metrics) && o.metrics.length ? o.metrics : ['cpu']).filter((k) => Object.prototype.hasOwnProperty.call(METRICS, k));
     if (!keys.length) keys.push('cpu');
     const single = keys.length === 1 ? METRICS[keys[0]] : null;
+    const kind = single?.hardware ? keys[0] : null;
+    box.dataset.metrics = keys.join(',');
+    if (kind) box.classList.add('hardware-chart');
     const isNet = keys.every((k) => k === 'down' || k === 'up');
     const label = single ? tp(single.name) : isNet ? tp('Network') : keys.map((k) => tp(METRICS[k].name)).join(' · ');
     box.style.setProperty('--c', color((single || METRICS[keys[0]]).color));
-    const head = h('div', 's-head', h('span', 's-label', label), h('span', 's-name', ''));
+    const head = h('div', 's-head', h('span', 's-label', kind ? icon(hardwareIcon(kind), 'hw-icon') : '', label), h('span', 's-name', ''));
     const main = h('div', 's-main');
     const canvas = h('canvas');
     box.append(head, main, canvas);
     if (keys.includes('cpu') || keys.includes('ram')) bindProcessLink(box, keys.includes('cpu') ? 'cpu' : 'mem');
     return {
       update() {
-        const s = D.state;
-        if (!s) return;
+        if (!D.state && !kind) return;
+        const s = D.state || {};
         if (single) {
           const [v, u] = metricText(single, s);
-          main.replaceChildren(h('b', null, v), h('small', null, u), h('span', 'chips', single.sub?.(s) ? h('span', 'chip', single.sub(s)) : ''));
+          const chips = kind ? h('span', 'chips', h('span', 'chip hw-chip',
+            kind === 'ram' ? h('span', 'hw-usage', single.sub(s)) : '', metricHardwareValues(kind, single, s)))
+            : h('span', 'chips', single.sub?.(s) ? h('span', 'chip', single.sub(s)) : '');
+          main.replaceChildren(h('b', null, v), h('small', null, u), chips);
           head.lastChild.textContent = single.title?.(s) || '';
         } else {
           main.replaceChildren(...keys.map((k) => {
@@ -389,23 +428,50 @@ W.meters = {
   needs: ['state'],
   create(box) {
     box.style.setProperty('--c', cssVar('--ram'));
-    const up = h('span', 's-name');
-    const list = h('div', 'meters');
-    box.append(h('div', 's-head', h('span', 's-label', t('w.memory')), up), list);
+    const up = h('span', 's-name'), list = h('div', 'meters');
+    list.tabIndex = 0;
+    list.setAttribute('aria-label', t('w.memory'));
+    box.append(h('div', 's-head', h('span', 's-label', icon('memory-stick', 'hw-icon'), t('w.memory')), up), list);
     bindProcessLink(box, 'mem');
     const meter = (name, txt, pct, c) => {
       const e = h('div', 'meter', h('div', 'm-row', h('span', null, name), h('span', null, txt)), h('div', 'track', h('i')));
-      e.querySelector('i').style.width = Math.min(100, pct) + '%';
+      e.querySelector('i').style.width = (sensorNumber(pct) ? Math.max(0, Math.min(100, pct)) : 0) + '%';
       if (c) e.style.setProperty('--c', c);
       return e;
     };
+    const deviceRows = (kind, entries, missing) => entries.map((e, i) => {
+      const name = sensorName(e.name) || sensorName(e.id) || `${kind === 'ram' ? tp('RAM') : tp('DISK')} ${i + 1}`;
+      const duplicate = entries.some((other, j) => j !== i && sensorName(other.name) === name);
+      const source = hardwareSource(e.source), id = sensorName(e.id);
+      const note = [source, duplicate ? id : '', !sensorNumber(e.temp) && !sensorPower(e.power) ? missing : ''].filter(Boolean).join(' · ');
+      const label = h('span', 'hw-device-name', icon(hardwareIcon(kind), 'hw-icon'), h('span', null, name));
+      label.title = [name, id, source].filter(Boolean).join(' · ');
+      const meta = h('span', 'hw-source', note);
+      meta.title = note;
+      const row = h('div', 'hw-device', h('div', 'hw-device-info', label, meta), hardwareValues(kind, e, missing));
+      row.dataset.kind = kind;
+      row.dataset.id = id;
+      return row;
+    });
     return {
       update() {
         const pc = D.state?.pc;
-        if (!pc) return;
+        if (!pc || typeof pc !== 'object' || Array.isArray(pc)) {
+          up.textContent = '';
+          list.replaceChildren(h('div', 'empty', tp('Loading…')));
+          return;
+        }
         const s = pc.uptimeSec, d = Math.floor(s / 86400), hr = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
-        up.textContent = tp('Up ') + (d ? `${d} d ${hr} h` : hr ? `${hr} h ${m} min` : `${m} min`);
-        const rows = [meter('RAM', `${r1(pc.ramUsedGb)} / ${Math.round(pc.ramTotalGb)} GB`, (pc.ramUsedGb / pc.ramTotalGb) * 100)];
+        up.textContent = sensorNumber(s) ? tp('Up ') + (d ? `${d} d ${hr} h` : hr ? `${hr} h ${m} min` : `${m} min`) : '';
+        const modules = hardwareItems(pc.temperatures?.ram), physical = hardwareItems(pc.temperatures?.storage), missing = hardwareStatus(pc);
+        const usage = sensorNumber(pc.ramUsedGb) && sensorNumber(pc.ramTotalGb) ? `${r1(pc.ramUsedGb)} / ${Math.round(pc.ramTotalGb)} GB` : '—';
+        const ram = meter(tp('RAM'), usage, pc.ramTotalGb > 0 ? (pc.ramUsedGb / pc.ramTotalGb) * 100 : null);
+        ram.classList.add('ram-usage');
+        const ramHead = ram.querySelector('.m-row');
+        ramHead.firstChild.prepend(icon('memory-stick', 'hw-icon'));
+        ramHead.lastChild.classList.add('m-reading');
+        ramHead.lastChild.replaceChildren(h('span', 'hw-usage', usage), hardwareValues('ram', hardwareReading(modules), missing));
+        const rows = [ram];
         // one row per GPU (the integrated one counts its shared memory); named once there is more than one
         const gpus = gpusOf(D.state);
         for (const g of gpus) {
@@ -413,8 +479,12 @@ W.meters = {
           if (m) rows.push(meter(gpus.length > 1 ? `${m.label === 'VRAM' ? 'VRAM' : 'GPU'} · ${shortGpu(g.name)}` : m.label === 'VRAM' ? 'VRAM' : tp('GPU MEMORY'),
             `${r1(m.used)} / ${Math.round(m.total)} GB`, (m.used / m.total) * 100, cssVar('--gpu')));
         }
-        const disks = h('div', 'disks', ...(pc.disks || []).map((dk) => meter(dk.name === '/' ? tp('DISK') : dk.name, Math.round((dk.usedGb / dk.totalGb) * 100) + '%', (dk.usedGb / dk.totalGb) * 100, '#94a3b8')));
-        list.replaceChildren(...rows, disks);
+        const volumes = Array.isArray(pc.disks) ? pc.disks.filter((dk) => dk && typeof dk === 'object') : [];
+        const disks = h('div', 'disks', ...volumes.map((dk) => meter(dk.name === '/' ? tp('DISK') : sensorName(dk.name), Math.round((dk.usedGb / dk.totalGb) * 100) + '%', (dk.usedGb / dk.totalGb) * 100, '#94a3b8')));
+        // 有名称的物理磁盘刻意与 C:/D:/E: 的逻辑卷使用量分开；绝不按数组位置关联传感器。
+        const scroll = list.scrollTop;
+        list.replaceChildren(...rows, disks, ...deviceRows('ram', modules, missing), ...deviceRows('storage', physical, missing));
+        list.scrollTop = scroll;
       },
     };
   },

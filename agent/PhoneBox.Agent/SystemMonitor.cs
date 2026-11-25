@@ -23,7 +23,7 @@ public sealed record DiskInfo(string Name, double UsedGb, double TotalGb);
 
 public sealed record PcSnapshot(double? Cpu, double? CpuTemp, string CpuName, double RamUsedGb, double RamTotalGb,
     GpuInfo? Gpu, double NetDownBps, double NetUpBps, IReadOnlyList<DiskInfo> Disks, long UptimeSec,
-    IReadOnlyList<GpuInfo>? Gpus = null);
+    IReadOnlyList<GpuInfo>? Gpus = null, TemperatureSnapshot? Temperatures = null, double? CpuPower = null);
 
 /// <summary>Samples CPU, RAM, network, disk and GPU metrics once a second.</summary>
 public sealed partial class SystemMonitor(ILogger<SystemMonitor> log, ConfigStore? config = null) : BackgroundService
@@ -36,6 +36,7 @@ public sealed partial class SystemMonitor(ILogger<SystemMonitor> log, ConfigStor
     // GPU sources, highest priority first: nvidia-smi, LibreHardwareMonitor, the OS (D3DKMT + counters / sysfs / ioreg)
     private volatile IReadOnlyList<GpuInfo>? _nvidia, _lhmGpus, _osGpus;
     private double? _cpuTemp;
+    private double? _cpuPower; // LHM 的实际 CPU 封装功耗（瓦）；绝不用 TDP 或核心传感器读数之和代替
     private double? _appleGpuTemp; // macOS: the GPU's temperature from the SMC, added to the ioreg GPU
     private IReadOnlyList<DiskInfo> _disks = [];
 
@@ -45,6 +46,7 @@ public sealed partial class SystemMonitor(ILogger<SystemMonitor> log, ConfigStor
     {
         _ = Task.Run(() => GpuLoop(ct), ct);
         _ = Task.Run(() => CpuTempLoop(ct), ct);
+        _ = Task.Run(() => StorageTempLoop(ct), ct);
 
         var (idle0, total0) = CpuTimes();
         var net0 = NetBytes(Chosen());
@@ -71,6 +73,7 @@ public sealed partial class SystemMonitor(ILogger<SystemMonitor> log, ConfigStor
             var (memUsed, memTotal) = Memory();
             const double Gb = 1024d * 1024 * 1024;
             var gpus = Gpus.Compose(_nvidia, _lhmGpus, _osGpus);
+            var temps = _lhmTemps;
 
             _snap = new PcSnapshot(
                 Cpu: cpu is { } c ? Math.Round(c, 1) : null,
@@ -83,7 +86,9 @@ public sealed partial class SystemMonitor(ILogger<SystemMonitor> log, ConfigStor
                 NetUpBps: Math.Round(up),
                 Disks: _disks,
                 UptimeSec: Environment.TickCount64 / 1000,
-                Gpus: gpus);
+                Gpus: gpus,
+                Temperatures: temps with { Storage = HardwareTemperatures.Storage(_windowsStorage, temps.Storage) },
+                CpuPower: _cpuPower);
         }
     }
 
@@ -235,11 +240,12 @@ public sealed partial class SystemMonitor(ILogger<SystemMonitor> log, ConfigStor
 
     // CPU temperature: Windows from LibreHardwareMonitor's web server (port 8085), when it is running; Linux from hwmon;
     // macOS on Apple silicon from the SMC (CPU and GPU). The same LibreHardwareMonitor answer carries the GPU sensors
-    // too (hot spot, board power, fan, clocks).
+    // 还包含 GPU 的热点温度、整卡功耗、风扇和频率，以及 CPU 封装功耗、内存与物理存储设备的温度及功耗。
     private async Task CpuTempLoop(CancellationToken ct)
     {
 #if !WINDOWS
         _lhmGpus = null; // LibreHardwareMonitor is Windows only
+        _cpuPower = null;
         if (OperatingSystem.IsMacOS()) { await AppleTempLoop(ct); return; }
         while (!ct.IsCancellationRequested)
         {
@@ -258,6 +264,8 @@ public sealed partial class SystemMonitor(ILogger<SystemMonitor> log, ConfigStor
                 using var doc = JsonDocument.Parse(await _http.GetStringAsync("http://127.0.0.1:8085/data.json", ct));
                 failures = 0;
                 _cpuTemp = FindCpuTemp(doc.RootElement);
+                _cpuPower = FindCpuPower(doc.RootElement);
+                _lhmTemps = FindHardwareTemps(doc.RootElement);
                 try { _lhmGpus = Gpus.ParseLhm(doc.RootElement); }
                 catch (Exception ex)
                 {
@@ -269,7 +277,7 @@ public sealed partial class SystemMonitor(ILogger<SystemMonitor> log, ConfigStor
             catch
             {
                 (var clear, delay) = LhmFailed(ref failures);
-                if (clear) { _cpuTemp = null; _lhmGpus = null; }
+                if (clear) { _cpuTemp = null; _cpuPower = null; _lhmGpus = null; _lhmTemps = new([], [], false); }
             }
             await Task.Delay(delay, ct);
         }

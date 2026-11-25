@@ -283,6 +283,9 @@ const ICONS = {
   'coffee': 'M10 2v2|M14 2v2|M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1|M6 2v2',
   'coins': 'M2 8a6 6 0 1 0 12 0a6 6 0 1 0 -12 0|M18.09 10.37A6 6 0 1 1 10.34 18|M7 6h1v4|m16.71 13.88.7.71-2.82 2.82',
   'container': 'M22 7.7c0-.6-.4-1.2-.8-1.5l-6.3-3.9a1.72 1.72 0 0 0-1.7 0l-10.3 6c-.5.2-.9.8-.9 1.4v6.6c0 .5.4 1.2.8 1.5l6.3 3.9a1.72 1.72 0 0 0 1.7 0l10.3-6c.5-.3.9-1 .9-1.5Z|M10 21.9V14L2.1 9.1|m10 14 11.9-6.9|M14 19.8v-8.1|M18 17.5V9.4',
+  'cpu': 'M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z|M9 9h6v6H9z|M9 1v3|M15 1v3|M9 20v3|M15 20v3|M1 9h3|M1 15h3|M20 9h3|M20 15h3',
+  'memory-stick': 'M2 6h20v12H2z|M6 10h4v4H6z|M14 10h4v4h-4z|M6 18v3|M10 18v3|M14 18v3|M18 18v3',
+  'gpu': 'M2 4v16|M2 7h18a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H2|M6 17v3h10v-3|M10 17v3|M6 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0|M14 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0',
   'door-open': 'M13 4h3a2 2 0 0 1 2 2v14|M2 20h3|M13 20h9|M10 12v.01|M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z',
   'droplet': 'M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z',
   'egg-fried': 'M8 12.5a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0|M3 8c0-3.5 2.5-6 6.5-6 5 0 4.83 3 7.5 5s5 2 5 6c0 4.5-2.5 6.5-7 6.5-2.5 0-2.5 2.5-6 2.5s-7-2-7-5.5c0-3 1.5-3 1.5-5C3.5 10 3 9 3 8Z',
@@ -543,24 +546,53 @@ export function gpuMem(g) {
 }
 const memText = (m) => `${r1(m.used)} / ${Math.round(m.total)} GB`;
 /** Board power: watts when a sensor gives them, otherwise the share of the power limit Windows reports. */
-export const gpuPower = (g) => (g?.power != null ? `${Math.round(g.power)} W` : g?.powerPct != null ? tpv('{n}% power', { n: Math.round(g.powerPct) }) : null);
+export const gpuPower = (g) => (sensorPower(g?.power) ? `${Math.round(g.power)} W` : sensorPower(g?.powerPct) ? tpv('{n}% power', { n: Math.round(g.powerPct) }) : null);
 export const netMax = () => Math.max(1, ...hist.down, ...hist.up) * 1.15;
+
+// 可选硬件传感器提供实际读数，不根据利用率或逻辑盘符估算。
+export const sensorName = (v) => typeof v === 'string' ? v.trim() : '';
+export const sensorNumber = (v) => typeof v === 'number' && Number.isFinite(v);
+export const sensorPower = (v) => sensorNumber(v) && v >= 0;
+export const hardwareItems = (list) => Array.isArray(list) ? list.filter((e) => e && typeof e === 'object' && !Array.isArray(e)
+  && (sensorName(e.name) || sensorName(e.id) || sensorNumber(e.temp) || sensorPower(e.power))) : [];
+export function hardwareReading(list) {
+  const temps = list.map((e) => e.temp).filter(sensorNumber), watts = list.map((e) => e.power).filter(sensorPower);
+  // 温度颜色取决于最高传感器温度；功耗显示各设备读数的范围，绝不显示不完整的总和。
+  return { temp: temps.length ? Math.max(...temps) : null, power: watts.length ? Math.min(...watts) : null,
+    powerMax: watts.length ? Math.max(...watts) : null };
+}
+export const hardwarePowerText = (r) => !sensorPower(r.power) ? '' : sensorPower(r.powerMax) && r.powerMax !== r.power
+  ? `${r1(r.power)}–${r1(r.powerMax)} W` : `${r1(r.power)} W`;
+export const hardwareText = (r) => [sensorNumber(r.temp) ? `${Math.round(r.temp)}°C` : '', hardwarePowerText(r)].filter(Boolean).join(' · ');
+export const hardwareStatus = (pc, kind) => !pc ? tp('Loading…') : kind === 'gpu' ? tp('No data')
+  : pc.temperatures?.lhmConnected === false ? tp('needs LibreHardwareMonitor')
+  : pc.temperatures?.lhmConnected === true ? tp('No sensor exposed') : tp('No data');
+export function hardwareHeat(temp, kind) {
+  // 这些是视觉提示，并非硬件上限。GPU 信息保留现有的 75/85°C 警告和高温分界；
+  // 独立 GPU 温度条仍使用设备报告的上限，温度仪表保留各自的高温设置。
+  const levels = kind === 'gpu' ? [50, 75, 85] : kind === 'ram' ? [35, 50, 65] : kind === 'storage' ? [35, 50, 60] : [50, 70, 85];
+  return !sensorNumber(temp) ? 'unknown' : temp < levels[0] ? 'cool' : temp < levels[1] ? 'normal' : temp < levels[2] ? 'warm' : 'hot';
+}
 
 export const METRICS = {
   cpu: { label: 'CPU', name: 'Processor', color: '--cpu', unit: '%', max: () => 100, val: (s) => s.pc?.cpu,
-    sub: (s) => (s.pc?.cpuTemp != null ? `${Math.round(s.pc.cpuTemp)}°C` : shortCpu(s.pc?.cpuName)), title: (s) => s.pc?.cpuName },
+    hardware: (s) => ({ temp: s.pc?.cpuTemp, power: s.pc?.cpuPower }),
+    sub: (s) => hardwareText({ temp: s.pc?.cpuTemp, power: s.pc?.cpuPower }) || shortCpu(sensorName(s.pc?.cpuName)), title: (s) => sensorName(s.pc?.cpuName) },
   gpu: { label: 'GPU', name: 'Graphics', color: '--gpu', unit: '%', max: () => 100, val: (s) => gpuOf(s)?.util,
+    hardware: (s) => { const g = gpuOf(s); return { temp: g?.temp, power: g?.power, powerPct: g?.powerPct }; },
     sub: (s) => {
       const g = gpuOf(s);
       if (!g) return tp('No GPU data');
-      const parts = [g.temp != null ? `${Math.round(g.temp)}°C` : null, gpuPower(g)].filter(Boolean);
+      const parts = [sensorNumber(g.temp) ? `${Math.round(g.temp)}°C` : null, gpuPower(g)].filter(Boolean);
       if (parts.length) return parts.join(' · ');
       const mem = gpuMem(g);
       if (mem) return tpv('{mem} memory', { mem: memText(mem) }); // no sensors (Apple GPU)
       return shortGpu(g.name) || tp('Active');
-    }, title: (s) => gpuOf(s)?.name },
+    }, title: (s) => sensorName(gpuOf(s)?.name) },
   ram: { label: 'RAM', name: 'Memory', color: '--ram', unit: 'GB', max: (s) => s.pc?.ramTotalGb || 1, val: (s) => s.pc?.ramUsedGb, fmt: r1,
-    pct: (s) => (s.pc ? (s.pc.ramUsedGb / s.pc.ramTotalGb) * 100 : null), sub: (s) => (s.pc && s.pc.ramTotalGb ? `${r1(s.pc.ramUsedGb)} / ${Math.round(s.pc.ramTotalGb)} GB` : '') },
+    hardware: (s) => hardwareReading(hardwareItems(s.pc?.temperatures?.ram)),
+    pct: (s) => (sensorNumber(s.pc?.ramUsedGb) && s.pc.ramTotalGb > 0 ? (s.pc.ramUsedGb / s.pc.ramTotalGb) * 100 : null),
+    sub: (s) => (s.pc && s.pc.ramTotalGb ? `${r1(s.pc.ramUsedGb)} / ${Math.round(s.pc.ramTotalGb)} GB` : '') },
   vram: { label: 'VRAM', name: 'Video memory', color: '--gpu', unit: '%', max: () => 100,
     val: (s) => { const m = gpuMem(gpuOf(s)); return m ? (m.used / m.total) * 100 : null; },
     sub: (s) => { const m = gpuMem(gpuOf(s)); return m ? memText(m) : tp('No GPU data'); } },
@@ -1558,6 +1590,7 @@ export function buildLayout() {
     pausedPageId = null;
   }
   buildDots();
+  webResize?.observe($('dots'));
   queueWebPage();
   curPage = -1;
   goPage(idx, true);
@@ -2020,27 +2053,45 @@ function hideWeb() {
   webShown = '';
   try { bridge && bridge.webPage('hide', '', '', 0, 0, 0, 0); } catch (_) {}
 }
-/** The app's view follows the card: on every scroll frame, so the site stays inside its frame while the pages move. */
+/** 真实面板的 Dock 保持在原生站点视图下方；只在站点绘制时裁去 Dock 可见矩形区域。 */
+function webDockRect() {
+  const dots = $('dots'), style = getComputedStyle(dots);
+  if (dots.hidden || style.visibility !== 'visible' || +style.opacity === 0 || style.pointerEvents === 'none') return [0, 0, 0, 0];
+  const r = dots.getBoundingClientRect();
+  const x = Math.max(0, r.left), y = Math.max(0, r.top);
+  const w = Math.min(innerWidth, r.right) - x, h = Math.min(innerHeight, r.bottom) - y;
+  return w > 0 && h > 0 ? [x, y, w, h] : [0, 0, 0, 0];
+}
+/** 应用视图随完整卡片主体移动，页面滑动时也保持同步；不为 Dock 预留条带区域。 */
 export function syncWebPage() {
   if (!bridge || !bridge.webPage) return;
   const p = pages[curPage];
   const slot = p && webSlots.get(p.id || p.title);
-  if (!slot) { hideWeb(); return; }
+  if (!slot || document.hidden) { hideWeb(); return; }
   const site = slot.sites[slot.index] || slot.sites[0];
   const r = slot.body.getBoundingClientRect();
-  if (!r.width || !r.height) return;
-  if (r.right <= 0 || r.left >= window.innerWidth) { hideWeb(); return; } // the card slid away
-  const key = [site.url, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)].join('|');
+  if (!r.width || !r.height || r.right <= 0 || r.left >= innerWidth || r.bottom <= 0 || r.top >= innerHeight) { hideWeb(); return; }
+  const dock = webDockRect();
+  const key = [p.id || p.title, site.url, r.left, r.top, r.width, r.height, ...dock].join('|');
   if (key === webShown) return;
-  webShown = key;
-  try { bridge.webPage('show', site.url, p.id || p.title, r.left, r.top, r.width, r.height); } catch (_) {}
+  try {
+    bridge.webPage('dock', '', '', ...dock);
+    bridge.webPage('show', site.url, p.id || p.title, r.left, r.top, r.width, r.height);
+    webShown = key;
+  } catch (_) {}
 }
 function queueWebPage() {
   if (webRaf) return;
   webRaf = requestAnimationFrame(() => { webRaf = 0; syncWebPage(); });
 }
-// A rotation or a resize moves the card: tell the app the new area.
-window.addEventListener('resize', () => { webShown = ''; queueWebPage(); });
+// 旋转或调整尺寸会移动卡片和 Dock；隐藏任一元素时也必须清除其原生几何信息。
+window.addEventListener('resize', queueWebPage);
+document.addEventListener('visibilitychange', () => { if (document.hidden) hideWeb(); else queueWebPage(); });
+if (typeof MutationObserver === 'function') {
+  const dockChanges = new MutationObserver(() => { if (webSlots.size) queueWebPage(); });
+  dockChanges.observe($('dots'), { attributes: true, attributeFilter: ['class', 'style', 'hidden'] });
+  dockChanges.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
+}
 // The app hid the browser view (Back at the first page, or its Panel pill): return to the home page.
 window.onAndroidWebClosed = () => { webShown = ''; goPage(homeIndex(), true); };
 
@@ -2120,6 +2171,8 @@ export function applyPageBar() {
   $('dots').classList.toggle('pb-vertical', shown && side !== 'bottom');
   // a docked bar changes the size of the pages: keep the current one in place
   if (reflow) requestAnimationFrame(() => goPage(curPage, true));
+  // 打开或关闭叠层只改变原生裁剪区域，不改变站点尺寸。
+  if (webSlots.size) queueWebPage();
 }
 /** Whether the dots show as a page bar down the left or right edge (slides then go up and down). */
 const barVertical = () => $('dots').classList.contains('pagebar') && $('dots').classList.contains('pb-vertical');

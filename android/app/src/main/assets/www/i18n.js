@@ -12160,6 +12160,22 @@
   }
   delete window.PhoneBoxLocaleData;
 
+  // An available sensor source can still expose no readings for this hardware.
+  const SENSOR_EMPTY = {
+    tr: 'Kullanılabilir sensör yok', de: 'Kein Sensor verfügbar', fr: 'Aucun capteur disponible',
+    es: 'Ningún sensor disponible', it: 'Nessun sensore disponibile', pt: 'Nenhum sensor disponível',
+    'pt-BR': 'Nenhum sensor disponível', nl: 'Geen sensor beschikbaar', pl: 'Brak udostępnionego czujnika',
+    ru: 'Нет доступного датчика', el: 'Δεν παρέχεται αισθητήρας', vi: 'Không có cảm biến khả dụng',
+    zh: '未提供温度传感器', ja: '温度センサーなし', ko: '제공되는 센서 없음',
+    id: 'Tidak ada sensor yang tersedia', th: 'ไม่มีเซ็นเซอร์ที่ใช้งานได้', uk: 'Немає доступного датчика',
+    hi: 'कोई सेंसर उपलब्ध नहीं है', cs: 'Není dostupný žádný senzor', ar: 'لا يتوفر مستشعر',
+    'zh-Hant': '未提供溫度感測器',
+  };
+  for (const [lang, text] of Object.entries(SENSOR_EMPTY)) {
+    if (!PANEL[lang]) PANEL[lang] = {};
+    PANEL[lang]['No sensor exposed'] = text;
+  }
+
   let pref = 'auto';
   let active = 'en';
 

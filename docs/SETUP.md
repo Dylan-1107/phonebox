@@ -198,6 +198,8 @@ deletes the settings, and `-Apk` / `--apk` removes the app from the connected ph
 |---|---|---|---|
 | CPU, RAM, network, disks, ping | ✓ | ✓ | ✓ |
 | CPU temperature | LibreHardwareMonitor | ✓ (hwmon) | — |
+| RAM temperature | LibreHardwareMonitor, when DIMM sensors are accessible | — | — |
+| Physical disk temperature | Windows storage reliability counters; LibreHardwareMonitor fallback | — | — |
 | GPU load, VRAM, temperature | Any vendor (Windows GPU counters); NVIDIA adds power, fan and clocks (`nvidia-smi`), AMD / Intel add them with LibreHardwareMonitor | NVIDIA (`nvidia-smi`), AMD (`amdgpu` sysfs), Intel (`i915` / `xe`: load and clock) | Apple silicon (`ioreg`) |
 | Now playing + controls | ✓ (any app) | ✓ (MPRIS via `playerctl`) | System media, including browser video, with `nowplaying-cli`; Spotify and Music fallback |
 | Volume | ✓ | ✓ (`wpctl` / `pactl`) | ✓ |
@@ -219,6 +221,33 @@ port 8085 for the CPU temperature and, on AMD and Intel graphics cards, the hot 
 watts, fan speed and clocks. Without it Windows still reports any GPU's load, VRAM, temperature and power share; NVIDIA
 cards get the full set from `nvidia-smi`. A PC with two GPUs (a graphics card and the processor's integrated one) shows
 both: the card is the main GPU, the GPU details widget can show either.
+
+#### Temperature and power in the existing hardware cards
+
+CPU temperature (Celsius) and package power (watts) belong beside the existing CPU readouts: the Home statistics and
+System CPU chart metadata, following the GPU's existing placement. CPU and GPU use matching temperature/power icons
+and temperature colors; power stays neutral. Physical RAM module and drive readings appear in the existing
+memory/disks card. There is no separate temperature widget or extra region; GPU data collection is unchanged.
+Panel assets are embedded in both the agent and Android app, so these readouts need an updated agent and APK.
+
+On Windows, physical drive temperatures are sampled about every 15 seconds through storage reliability counters.
+Partitions do not create extra temperature entries. Some devices, controllers, or permissions do not expose
+these counters; the agent does not elevate itself. LibreHardwareMonitor can fill missing disk readings when available.
+Sources are joined by model name only when each source lists exactly one drive of that model. Identical-model drives
+remain separate source readings rather than guessing which physical disk a reading belongs to. A unique match keeps
+the native disk temperature and any actual LHM power reading, with both sources identified.
+
+CPU temperature and actual CPU package power need LibreHardwareMonitor's web server below on Windows. Package watts
+are never inferred from TDP, power limits, CPU utilization, DRAM power, or a sum of core readings. Physical RAM
+temperature also needs a DIMM thermal sensor and working SMBus/SPD access; use a recent LibreHardwareMonitor release
+with DIMM sensor support. A CPU/GPU memory reading, RAM usage, or a temperature limit is not a substitute for the
+DIMM's live temperature.
+
+RAM and drive watts are available only if LibreHardwareMonitor exposes a live **Power** sensor on that physical
+device. Most devices do not expose one; native Windows storage counters do not supply watts. Temperature and power
+are independent, so a device can report either or both. Missing sensors stay unavailable, never an invented zero;
+a real zero-watt reading remains zero. GPU and native disk temperatures still work when LibreHardwareMonitor is not
+running.
 
 #### LibreHardwareMonitor on Windows
 
