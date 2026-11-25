@@ -554,6 +554,39 @@ body.offline .offline-msg { display: flex; }
 .track i { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--c, var(--cpu)); transition: width .6s ease; }
 .disks { display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 8px; }
 
+/* Actual hardware readings use the existing chart/tile metadata and memory rows; no filled sub-cards. */
+.hw-icon { width: 13px; height: 13px; vertical-align: -2px; margin-inline-end: 4px; flex: none; }
+.hw-values { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 11px; line-height: 1.2; white-space: nowrap; color: var(--muted); }
+.hw-values .ico { width: 11px; height: 11px; margin: 0; flex: none; }
+.hw-temp, .hw-power { display: inline-flex; align-items: center; gap: 2px; }
+.hw-values[data-kind] .hw-number { color: inherit; }
+.hw-values[data-kind] .hw-power { color: var(--text); }
+.hw-values[data-heat="cool"] .hw-temp { color: #22d3ee; }
+.hw-values[data-heat="normal"] .hw-temp { color: #4ade80; }
+.hw-values[data-heat="warm"] .hw-temp { color: #fbbf24; }
+.hw-values[data-heat="hot"] .hw-temp { color: #f87171; }
+.hw-values[data-heat="unknown"] .hw-temp { color: var(--muted); }
+.hardware-chart .hw-chip { display: inline-flex; align-items: center; gap: 6px; padding-inline: 0; background: transparent; box-shadow: none; }
+.hardware-stat .t-label { display: flex; align-items: center; gap: 4px; }
+.hardware-stat .t-label .hw-icon { margin: 0; }
+.hardware-stat .t-sub { display: flex; align-items: center; text-shadow: none; }
+.hardware-stat .t-extra { position: relative; display: flex; flex-wrap: wrap; gap: 1px 6px; margin-top: 1px; line-height: 1.1; }
+.hardware-stat .t-extra .hw-values { gap: 4px; font-size: 9.5px; line-height: 1.1; }
+.hardware-stat .t-extra .ico { width: 10px; height: 10px; }
+@container (max-height: 60px) { .hardware-stat .t-sub, .hardware-stat .t-extra { display: none; } }
+.w-meters > .s-head { flex: none; }
+.w-meters > .meters { justify-content: flex-start; overflow-y: auto; overflow-x: hidden; padding-block-end: 3px; scrollbar-width: thin; touch-action: pan-x pan-y; }
+.w-meters > .meters:focus-visible { outline: 1px solid var(--muted); outline-offset: -1px; }
+.w-meters > .meters > * { flex: none; }
+.w-meters .m-reading { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 2px 8px; max-width: calc(100% - 40px); }
+.hw-device { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 1px 0; }
+.hw-device-info { flex: 1; min-width: 0; }
+.hw-device-name { display: flex; align-items: center; font-size: 11px; min-width: 0; }
+.hw-device-name > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hw-source { display: block; font-size: 9.5px; line-height: 1.15; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hw-device > .hw-values { flex: none; }
+.w-meters > .meters > .empty { height: auto; min-height: 24px; padding: 0; font-size: 11px; }
+
 /* ---------- AI quotas ---------- */
 .w-quotas { background: none; border: 0; }
 .q-grid { height: 100%; display: flex; gap: 10px; }
@@ -1522,11 +1555,14 @@ body.waking::after { opacity: 0; pointer-events: auto; transition: opacity .2s e
 .gd-big b { font-size: clamp(18px, 15cqh, 34px); font-weight: 500; letter-spacing: -0.02em; }
 .gd-big small { font-size: 12.5px; color: var(--muted); }
 .gd-big .empty { height: auto; padding: 18px 0; }
-.gd-temp { margin-inline-start: auto; font-size: 12px; color: #fdba74; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gd-temp { margin-inline-start: auto; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 2px 6px; min-width: 0; font-size: 11px; color: var(--muted); }
+.gd-sensor, .gd-reading { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; max-width: 100%; white-space: nowrap; }
+.w-gpu .gd-reading .gd-limit { color: var(--muted); }
 .gd-rows { margin-top: 6px; }
 .gd-chips { margin: 8px 0 0; justify-content: flex-start; max-height: 48px; }
 @container (max-height: 190px) { .w-gpu .gd-chips { display: none; } }
 @container (max-height: 120px) { .w-gpu .gd-rows .meter:nth-child(n+2) { display: none; } }
+
 /* app console: the focused app's keys, and a dial when the profile has one */
 .w.ac { display: grid; grid-template-rows: auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); position: relative; }
 .w.ac.ac-has-dial { grid-template-columns: minmax(0, 1fr) auto; }

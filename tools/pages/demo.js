@@ -199,10 +199,17 @@
       update: null, ts: now(), host: 'DESK-PC', os: window.__demoOs || 'windows', cfgVersion: cfgVersion(), pushVersion, evSeq: seq, rules: ['music'], rulesPaused: rulesPaused > now() ? rulesPaused : null,
       events: since == null ? [] : events.filter((e) => e.seq > since),
       pc: {
-        cpu: Math.max(1, wave(37, 8, 46, 0, 6)), cpuName: 'AMD Ryzen 9 7950X 16-Core Processor', cpuTemp: wave(60, 52, 68),
+        cpu: Math.max(1, wave(37, 8, 46, 0, 6)), cpuName: 'AMD Ryzen 9 7950X 16-Core Processor', cpuTemp: wave(60, 52, 68), cpuPower: wave(37, 42, 96),
         ramUsedGb: wave(120, 21, 24), ramTotalGb: 64, netDownBps: Math.max(0, wave(23, 0.2e6, 9e6, 0, 1e6)), netUpBps: Math.max(0, wave(17, 40e3, 600e3, 1, 50e3)),
         uptimeSec: 3 * 86400 + 5 * 3600 + Math.floor((now() - START) / 1000),
         disks: [{ name: 'C:', usedGb: 612, totalGb: 1000 }, { name: 'D:', usedGb: 1450, totalGb: 2000 }, { name: 'E:', usedGb: 310, totalGb: 4000 }],
+        temperatures: { lhmConnected: true,
+          ram: [{ id: 'dimm-a2', name: 'DIMM A2 · 32 GB', temp: wave(80, 37, 43), power: wave(80, 3.8, 5.2), source: 'lhm' },
+            { id: 'dimm-b2', name: 'DIMM B2 · 32 GB', temp: wave(80, 38, 44, 1), power: wave(80, 4.1, 5.6, 1), source: 'lhm' }],
+          storage: [{ id: 'nvme-0', name: 'Samsung SSD 990 PRO 1TB', temp: wave(90, 39, 49), power: wave(90, 2.5, 5.5), source: 'lhm' },
+            { id: 'nvme-1', name: 'WD_BLACK SN850X 2TB', temp: wave(90, 37, 45, 1), power: null, source: 'lhm' },
+            { id: 'sata-0', name: 'Seagate BarraCuda 4TB', temp: wave(120, 31, 36), power: wave(120, 3, 4.5), source: 'lhm' }],
+        },
         ...(() => {
           const gpus = [
             { name: 'NVIDIA GeForce RTX 4080', util: Math.max(0, wave(29, 4, 38, 2, 4)), temp: wave(50, 46, 61), power: wave(29, 38, 140, 2),

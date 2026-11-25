@@ -5,8 +5,13 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
@@ -49,6 +54,8 @@ class BrowserMediaTest {
     @After fun tearDown() {
         instrumentation.runOnMainSync {
             (view.parent as? android.view.ViewGroup)?.removeView(view)
+            val active = activity.javaClass.getDeclaredField("pageWebView").apply { isAccessible = true }
+            if (active.get(activity) === view) active.set(activity, null)
             view.destroy()
         }
         // The panel's normal resume path restores its audio mode and display behavior.
@@ -135,6 +142,99 @@ class BrowserMediaTest {
         grant(request)
         assertTrue(request.denied)
         assertNull(request.granted)
+    }
+
+    // 仅做本地检查，不更改已安装的页面、凭据或站点内容。
+    @Test fun dockCutoutTracksOverlapAfterSiteScrollAndClears() {
+        instrumentation.runOnMainSync {
+            panelView().visibility = View.INVISIBLE
+            (view.parent as View).setBackgroundColor(Color.GREEN)
+            view.setBackgroundColor(Color.BLUE)
+            view.loadDataWithBaseURL("https://phonebox.test/", "<meta name=viewport content='width=device-width'><body style='margin:0;background:blue;height:4000px'>", "text/html", "UTF-8", null)
+        }
+        awaitReport("JSON.stringify({state: document.readyState === 'complete' ? 'passed' : 'running'})", 10)
+        instrumentation.waitForIdleSync()
+        instrumentation.runOnMainSync {
+            val root = view.parent as android.view.ViewGroup
+            // 让站点保持内缩，以确保裁剪区域必须从根视图坐标转换为站点坐标。
+            view.layout(20, 30, root.width - 20, root.height - 30)
+            val x = view.left + view.width / 2
+            val y = view.bottom - 25
+            val bounds = listOf(view.left, view.top, view.right, view.bottom)
+            dock(x - 30f, y - 10f, 60f, 20f)
+            fun pixels() {
+                val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+                root.draw(Canvas(bitmap))
+                assertEquals("Only the overlap reveals the underlying panel surface", Color.GREEN, bitmap.getPixel(x, y))
+                assertEquals("No full-width bottom strip", Color.BLUE, bitmap.getPixel(x - 60, y))
+                assertEquals("Site still fills the body below the dock", Color.BLUE, bitmap.getPixel(x, y + 15))
+                bitmap.recycle()
+            }
+            pixels()
+            view.scrollTo(0, 120)
+            assertTrue("The draw check must include a scrolled WebView", view.scrollY > 0)
+            pixels()
+            assertEquals(bounds, listOf(view.left, view.top, view.right, view.bottom))
+            dock(0f, 0f, 0f, 0f)
+            val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+            root.draw(Canvas(bitmap))
+            assertEquals(Color.BLUE, bitmap.getPixel(x, y))
+            bitmap.recycle()
+        }
+    }
+
+    @Test fun dockOwnsOnlyGesturesStartingInOverlapIncludingPrimaryMouse() {
+        instrumentation.runOnMainSync {
+            val panel = panelView()
+            val panelActions = ArrayList<Int>()
+            val siteActions = ArrayList<Int>()
+            val tools = ArrayList<Int>()
+            panel.setOnTouchListener { _, e -> panelActions.add(e.actionMasked); tools.add(e.getToolType(0)); true }
+            view.setOnTouchListener { _, e -> siteActions.add(e.actionMasked); true }
+            activity.javaClass.getDeclaredField("pageWebView").apply { isAccessible = true }.set(activity, view)
+            val x = view.width / 2f
+            val y = view.height / 2f
+            val location = IntArray(2)
+            (view.parent as View).getLocationInWindow(location)
+            fun send(action: Int, px: Float, mouse: Boolean = false) {
+                val props = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = if (mouse) MotionEvent.TOOL_TYPE_MOUSE else MotionEvent.TOOL_TYPE_FINGER })
+                val coords = arrayOf(MotionEvent.PointerCoords().apply { this.x = px + location[0]; this.y = y + location[1]; pressure = 1f; size = 1f })
+                val now = SystemClock.uptimeMillis()
+                val event = MotionEvent.obtain(now, now, action, 1, props, coords, 0, if (mouse && action != MotionEvent.ACTION_UP) MotionEvent.BUTTON_PRIMARY else 0,
+                    1f, 1f, 0, 0, if (mouse) InputDevice.SOURCE_MOUSE else InputDevice.SOURCE_TOUCHSCREEN, 0)
+                try { activity.dispatchTouchEvent(event) } finally { event.recycle() }
+            }
+            val gesture = listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE, MotionEvent.ACTION_UP)
+            dock(x - 10, y - 10, 20f, 20f)
+            send(MotionEvent.ACTION_DOWN, x)
+            dock(0f, 0f, 0f, 0f) // 关闭或移动 Dock 时不能丢弃已捕获的手势
+            send(MotionEvent.ACTION_MOVE, x + 40)
+            send(MotionEvent.ACTION_UP, x + 40)
+            assertEquals(gesture, panelActions)
+            assertTrue(siteActions.isEmpty())
+            panelActions.clear(); tools.clear()
+            dock(x - 10, y - 10, 20f, 20f)
+            send(MotionEvent.ACTION_DOWN, x + 40) // 从站点开始的滚动即使移入 Dock，仍归站点处理
+            send(MotionEvent.ACTION_MOVE, x)
+            send(MotionEvent.ACTION_UP, x)
+            assertEquals(gesture, siteActions)
+            assertTrue(panelActions.isEmpty())
+            send(MotionEvent.ACTION_DOWN, x, true)
+            send(MotionEvent.ACTION_MOVE, x + 40, true)
+            send(MotionEvent.ACTION_UP, x + 40, true)
+            assertEquals(gesture, panelActions)
+            assertEquals(List(3) { MotionEvent.TOOL_TYPE_FINGER }, tools)
+            panel.setOnTouchListener(null); view.setOnTouchListener(null)
+        }
+    }
+
+    private fun panelView(): WebView = activity.javaClass.getDeclaredField("web").apply { isAccessible = true }.get(activity) as WebView
+
+    /** 测试坐标使用根视图的物理像素，而经过身份验证的桥接接口使用 CSS 像素。 */
+    private fun dock(x: Float, y: Float, w: Float, h: Float) {
+        val d = activity.resources.displayMetrics.density
+        activity.javaClass.getDeclaredMethod("updatePageDock", Float::class.javaPrimitiveType, Float::class.javaPrimitiveType,
+            Float::class.javaPrimitiveType, Float::class.javaPrimitiveType).apply { isAccessible = true }.invoke(activity, x / d, y / d, w / d, h / d)
     }
 
     private fun grant(request: PermissionRequest) = instrumentation.runOnMainSync {

@@ -1,6 +1,6 @@
-import { $, API, D, curPage, pages, PANEL_HEADERS, PREVIEW, LOCALE, Q_STYLE, api, bridge, cfg, cfgVersion, configMark, configReadSince, localWriteStored, loadConfig, color, cssVar, rulesPaused, toggleRulesPause, fillIcon, fmtDur, fmtHM, fmtMem, gotoPageRef, gpuMem, gpusOf, h, en, haptic, icon, openSheet, paceInfo, pad, pairedPcs, quotaProviders, r1, shortDur, shortGpu, store, switchPc, t, tick, toast, transport, emo, labelled, rich, tp, tpv, quotaText } from '../main.js';
+import { $, API, D, curPage, pages, PANEL_HEADERS, PREVIEW, LOCALE, Q_STYLE, api, bridge, cfg, cfgVersion, configMark, configReadSince, localWriteStored, loadConfig, color, cssVar, rulesPaused, toggleRulesPause, fillIcon, fmtDur, fmtHM, fmtMem, gotoPageRef, gpuMem, gpusOf, hardwareStatus, h, en, haptic, icon, openSheet, paceInfo, pad, pairedPcs, quotaProviders, r1, sensorNumber, sensorPower, shortDur, shortGpu, store, switchPc, t, tick, toast, transport, emo, labelled, rich, tp, tpv, quotaText } from '../main.js';
 import { W } from '../registry.js';
-import { canKillAnywhere, dialEl, every } from './helpers.js';
+import { canKillAnywhere, dialEl, every, hardwareIcon, hardwareValues } from './helpers.js';
 
 // ---------------------------------------------------------------- phone & PC
 // Your own HTML / CSS / JavaScript in a sandboxed iframe (no access to the panel, the agent or the phone). It gets
@@ -1431,26 +1431,31 @@ W.gpu = {
           chips.replaceChildren();
           return;
         }
-        label.textContent = (GPU_VENDOR[g.vendor] || 'GPU') + (g.integrated ? ' · iGPU' : '');
+        label.replaceChildren(icon(hardwareIcon('gpu'), 'hw-icon'), (GPU_VENDOR[g.vendor] || 'GPU') + (g.integrated ? ' · iGPU' : ''));
         name.textContent = shortGpu(g.name);
         name.title = g.name;
 
-        const temps = [g.temp != null ? `${Math.round(g.temp)}°C` : null, g.hotSpot != null ? tpv('hot spot {n}°', { n: Math.round(g.hotSpot) }) : null,
-          g.memTemp != null ? tpv('memory {n}°', { n: Math.round(g.memTemp) }) : null].filter(Boolean).join(' · ');
-        big.replaceChildren(h('b', null, g.util != null ? String(Math.round(g.util)) : '—'), h('small', null, tp('% load')), h('span', 'gd-temp', temps));
+        const missing = hardwareStatus(D.state?.pc, 'gpu'), temps = h('span', 'gd-temp', hardwareValues('gpu', { temp: g.temp }, missing));
+        // 此处保留现有的边缘、热点和显存信息；仅共用温度读数的显示样式。
+        if (sensorNumber(g.hotSpot)) temps.append(h('span', 'gd-sensor', h('span', null, tp('GPU hot spot')), hardwareValues('gpu', { temp: g.hotSpot }, missing)));
+        if (sensorNumber(g.memTemp)) temps.append(h('span', 'gd-sensor', h('span', null, tp('GPU memory')), hardwareValues('gpu', { temp: g.memTemp }, missing)));
+        big.replaceChildren(h('b', null, g.util != null ? String(Math.round(g.util)) : '—'), h('small', null, tp('% load')), temps);
 
         const list = [];
         const mem = gpuMem(g);
         if (mem) list.push(meter(mem.label === 'VRAM' ? 'VRAM' : tp('GPU memory'), `${r1(mem.used)} / ${Math.round(mem.total)} GB`, (mem.used / mem.total) * 100));
         if (!g.integrated && g.sharedTotal && g.sharedUsed != null) list.push(meter(tp('Shared memory'), `${r1(g.sharedUsed)} GB`, (g.sharedUsed / g.sharedTotal) * 100, '#64748b'));
-        if (g.power != null) {
-          list.push(meter(tp('Power'), g.powerLimit ? `${Math.round(g.power)} / ${Math.round(g.powerLimit)} W` : `${Math.round(g.power)} W`,
-            g.powerLimit ? (g.power / g.powerLimit) * 100 : g.powerPct, '#facc15'));
-        } else if (g.powerPct != null) list.push(meter(tp('Power'), tpv('{n}% of limit', { n: Math.round(g.powerPct) }), g.powerPct, '#facc15'));
-        const hottest = Math.max(g.temp ?? -1, g.hotSpot ?? -1);
-        if (hottest >= 0) {
-          const max = g.tempMax || (g.hotSpot != null ? 110 : 100);
-          list.push(meter(tp('Temperature'), `${Math.round(hottest)} / ${Math.round(max)}°C`, (hottest / max) * 100, heat(hottest, max)));
+        if (sensorPower(g.power)) {
+          const limit = sensorPower(g.powerLimit) && g.powerLimit > 0 ? g.powerLimit : null;
+          const reading = h('span', 'gd-reading', hardwareValues('gpu', { power: g.power }, missing),
+            limit ? h('span', 'gd-limit', `/ ${Math.round(limit)} W`) : '');
+          list.push(meter(tp('Power'), reading, limit ? (g.power / limit) * 100 : sensorPower(g.powerPct) ? g.powerPct : 0, '#facc15'));
+        } else if (sensorPower(g.powerPct)) list.push(meter(tp('Power'), hardwareValues('gpu', { powerPct: g.powerPct }, missing), g.powerPct, '#facc15'));
+        const actualTemps = [g.temp, g.hotSpot].filter(sensorNumber), hottest = actualTemps.length ? Math.max(...actualTemps) : null;
+        if (hottest != null) {
+          const max = sensorNumber(g.tempMax) && g.tempMax > 0 ? g.tempMax : sensorNumber(g.hotSpot) ? 110 : 100;
+          list.push(meter(tp('Temperature'), h('span', 'gd-reading', hardwareValues('gpu', { temp: hottest }, missing),
+            h('span', 'gd-limit', `/ ${Math.round(max)}°C`)), (hottest / max) * 100, heat(hottest, max)));
         }
         rows.replaceChildren(...list);
 

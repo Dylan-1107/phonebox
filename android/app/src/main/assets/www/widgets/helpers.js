@@ -1,4 +1,26 @@
-import { $, LOCALE, cfg, h, ringSvg, safeFetch, sizeCanvas, store } from '../main.js';
+import { $, LOCALE, cfg, h, hardwareHeat, hardwarePowerText, icon, ringSvg, safeFetch, sensorNumber, sensorPower, sizeCanvas, store, tp, tpv } from '../main.js';
+
+// 现有的统计、图表、内存卡片与独立 GPU 卡片共用硬件信息。
+export const hardwareIcon = (kind) => kind === 'gpu' ? 'gpu' : kind === 'ram' ? 'memory-stick' : kind === 'storage' ? 'hard-drive' : 'cpu';
+export function hardwareValues(kind, reading, missing, badge = false) {
+  const values = h('span', 'hw-values'), watts = hardwarePowerText(reading);
+  // Windows 可能只提供占功耗上限的比例。明确显示为百分比，不将其当作实测瓦数。
+  const power = watts || (kind === 'gpu' && sensorPower(reading.powerPct) ? tpv('{n}% of limit', { n: Math.round(reading.powerPct) }) : '');
+  values.dataset.kind = kind;
+  values.dataset.heat = hardwareHeat(reading.temp, kind);
+  if (badge) values.append(icon(hardwareIcon(kind), 'hw-icon'));
+  if (sensorNumber(reading.temp) || !power) values.append(h('span', 'hw-temp', icon('thermometer'),
+    h('span', 'hw-number', sensorNumber(reading.temp) ? `${Math.round(reading.temp)}°C` : '—')));
+  if (power) {
+    const value = h('span', 'hw-power', icon('zap'), h('span', 'hw-number', power));
+    value.dataset.unit = watts ? 'watt' : 'percent';
+    values.append(value);
+  }
+  const label = kind === 'gpu' ? tp('GPU') : kind === 'ram' ? tp('RAM') : kind === 'storage' ? tp('DISK') : tp('CPU');
+  values.title = `${label} · ${tp('Temperature')}: ${sensorNumber(reading.temp) ? Math.round(reading.temp) + '°C' : missing} · ${tp('Power')}: ${power || tp('No power data')}`;
+  values.setAttribute('aria-label', values.title);
+  return values;
+}
 
 // ---------------------------------------------------------------- more widgets: helpers
 export const inflight = {};

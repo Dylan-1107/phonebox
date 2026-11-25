@@ -1,0 +1,3 @@
+{"id":"c5706868d3","kind":"rule","text":"Do not install/run downloaded code or make file edits/config changes.","files":["install/run","edits/config"],"date":"2026-11-25","from":"360dd90c-e57d-4cfd-8638-801da3e6939a"}
+{"id":"578775945c","kind":"rule","text":"Do not edit backend C# or package/lock files, no commit/push/deploy.","files":["package/lock","commit/push/deploy"],"date":"2026-11-25","from":"94216548-3423-4efa-b190-75cc08566732"}
+{"id":"17aa576eb5","kind":"rule","text":"Do not install dependencies (main session will run tests) or create reports/plans.","files":["reports/plans"],"date":"2026-11-25","from":"94216548-3423-4efa-b190-75cc08566732"}

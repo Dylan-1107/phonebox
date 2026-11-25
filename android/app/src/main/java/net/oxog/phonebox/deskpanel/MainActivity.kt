@@ -11,6 +11,9 @@ import android.content.IntentFilter
 import android.content.res.Configuration
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.graphics.Canvas
+import android.graphics.RectF
+import android.graphics.Region
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -69,6 +72,10 @@ class MainActivity : Activity(), SensorEventListener {
     private val siteViews = LinkedHashMap<String, WebView>()
     /** The key of the site that is showing now ("pageId|url"). */
     private var activeSiteKey: String? = null
+    /** 可见 #dots 在根视图中的像素边界。Dock 仅保留面板中的这一份。 */
+    private val pageDock = RectF()
+    /** 只有从 Dock 与站点重叠区域开始的手势才归面板处理。 */
+    private var dockTouch = false
     /** A site's microphone request waiting for the Android permission dialog. */
     private var pendingWebMic: PermissionRequest? = null
     /** False when Android could not start its WebView (#385): the activity then only shows why. */
@@ -272,14 +279,36 @@ class MainActivity : Activity(), SensorEventListener {
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (Build.VERSION.SDK_INT < 23 || event.getToolType(0) != MotionEvent.TOOL_TYPE_MOUSE)
-            return super.dispatchTouchEvent(event)
+            return dispatchPageTouchEvent(event)
         if (event.actionMasked == MotionEvent.ACTION_DOWN)
             mouseAsFinger = event.buttonState and (MotionEvent.BUTTON_SECONDARY or MotionEvent.BUTTON_TERTIARY) == 0
-        if (!mouseAsFinger) return super.dispatchTouchEvent(event)
+        if (!mouseAsFinger) return dispatchPageTouchEvent(event)
         try {
             return sendAsFinger(event, event.action)
         } finally {
             if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) mouseAsFinger = false
+        }
+    }
+
+    /** 仅将从 Dock 开始的手势穿过原生站点视图转交真实面板处理，包括最后的抬起或取消事件。 */
+    private fun dispatchPageTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            val location = IntArray(2)
+            if (::root.isInitialized) root.getLocationInWindow(location)
+            val overlap = pageWebView?.takeIf { it.visibility == View.VISIBLE }?.let { dockOverlap(it) }
+            dockTouch = overlap?.contains(event.x - location[0], event.y - location[1]) == true
+        }
+        if (!dockTouch) return super.dispatchTouchEvent(event)
+        val location = IntArray(2)
+        web.getLocationInWindow(location)
+        val panelEvent = MotionEvent.obtain(event)
+        panelEvent.offsetLocation(-location[0].toFloat(), -location[1].toFloat())
+        try {
+            web.dispatchTouchEvent(panelEvent)
+            return true // 绝不让面板未处理的事件继续传递给站点
+        } finally {
+            panelEvent.recycle()
+            if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) dockTouch = false
         }
     }
 
@@ -293,7 +322,7 @@ class MainActivity : Activity(), SensorEventListener {
         val finger = MotionEvent.obtain(event.downTime, event.eventTime, action, n, props, coords, event.metaState, 0,
             event.xPrecision, event.yPrecision, event.deviceId, event.edgeFlags, InputDevice.SOURCE_TOUCHSCREEN, event.flags)
         try {
-            return super.dispatchTouchEvent(finger)
+            return dispatchPageTouchEvent(finger)
         } finally {
             finger.recycle()
         }
@@ -337,13 +366,50 @@ class MainActivity : Activity(), SensorEventListener {
 
     private fun dp(value: Float): Int = (resources.displayMetrics.density * value).toInt()
 
+    /** Dock 只能在与站点当前布局实际重叠的像素区域透出。 */
+    private fun dockOverlap(view: View): RectF? {
+        if (pageDock.isEmpty) return null
+        val overlap = RectF(pageDock)
+        return if (overlap.intersect(view.left.toFloat(), view.top.toFloat(), view.right.toFloat(), view.bottom.toFloat())) overlap else null
+    }
+
+    private fun updatePageDock(x: Float, y: Float, w: Float, h: Float) {
+        val next = RectF()
+        if (x.isFinite() && y.isFinite() && w.isFinite() && h.isFinite() && w > 0 && h > 0) {
+            val density = resources.displayMetrics.density
+            next.set(x * density, y * density, (x + w) * density, (y + h) * density)
+        }
+        if (pageDock == next) return
+        pageDock.set(next)
+        siteViews.values.filter { it.visibility == View.VISIBLE }.forEach { it.invalidate() }
+    }
+
+    /** 裁剪整个绘制区域，包括 WebView 背景，不调整站点尺寸或更改站点内容。 */
+    private inner class SiteWebView : WebView(this@MainActivity) {
+        @Suppress("DEPRECATION")
+        override fun draw(canvas: Canvas) {
+            val overlap = dockOverlap(this)
+            if (overlap == null) { super.draw(canvas); return }
+            // ViewGroup 绘制已滚动的子视图时，画布原点会按 -scrollX/-scrollY 偏移。
+            overlap.offset(scrollX.toFloat() - left, scrollY.toFloat() - top)
+            val saved = canvas.save()
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) canvas.clipOutRect(overlap)
+                else canvas.clipRect(overlap, Region.Op.DIFFERENCE)
+                super.draw(canvas)
+            } finally {
+                canvas.restoreToCount(saved)
+            }
+        }
+    }
+
     /**
      * The browser view of a page of kind "web" (PageConfig.Kind in the agent): a WebView of its own, placed over the
      * site area of that page's card, with no JavaScript bridge attached - a site shown here can reach nothing of the
      * phone. The card and its tabs stay in the panel; only a small "Panel" pill floats over the site.
      */
     private fun siteView(): WebView {
-        val view = WebView(this)
+        val view = SiteWebView()
         view.setBackgroundColor(0xFF0B0E12.toInt())
         with(view.settings) {
             javaScriptEnabled = true
@@ -433,6 +499,7 @@ class MainActivity : Activity(), SensorEventListener {
     }
 
     private fun hidePageWeb() {
+        updatePageDock(0f, 0f, 0f, 0f)
         var hid = false
         for (view in siteViews.values) {
             if (view.visibility == View.VISIBLE) {
@@ -809,8 +876,8 @@ class MainActivity : Activity(), SensorEventListener {
         fun launchApp(key: String, pkg: String): Boolean = ok(key) && phoneApps.launch(pkg)
 
         /**
-         * A page of kind "web": "show" with its address, or "hide" once another page is showing. The site is drawn in
-         * its own WebView above the panel (see pageWeb), which has no bridge: it can reach nothing of the phone.
+         * 对于 "web" 类型的页面，"show" 传入完整主体区域，"dock" 传入面板 Dock 的可见区域（传零清除），
+         * 显示其他页面时则调用 "hide"。站点使用独立的 WebView，且没有访问手机的桥接接口。
          */
         @JavascriptInterface
         fun webPage(key: String, action: String, url: String, pageKey: String, x: Double, y: Double, w: Double, h: Double) {
@@ -820,6 +887,7 @@ class MainActivity : Activity(), SensorEventListener {
                 when (action) {
                     "show" -> showPageWeb(pageKey, url.trim(), x.toFloat(), y.toFloat(), w.toFloat(), h.toFloat())
                     "hide" -> hidePageWeb()
+                    "dock" -> updatePageDock(x.toFloat(), y.toFloat(), w.toFloat(), h.toFloat())
                     // a site that got stuck (a permission prompt it answered wrongly, a failed load) can be reloaded
                     "reload" -> siteViews[pageKey + "|" + url.trim()]?.reload()
                 }
