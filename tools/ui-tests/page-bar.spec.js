@@ -85,7 +85,7 @@ const BROWSER_PAGES = [
   PAGES[0],
   { id: 'browser2', title: 'Browser 2', kind: 'web', url: 'https://example.test/', widgets: [] },
 ];
-async function showNativeBrowser(page, display, clock = false) {
+async function showNativeBrowserWithDockGeometry(page, display, clock = false) {
   await page.addInitScript(() => {
     window.__webCalls = [];
     window.Android = { webPage: (key, action, url, pageKey, x, y, w, h) => {
@@ -117,7 +117,7 @@ async function expectNativeGeometry(page) {
 }
 
 test('native browser fills the body; auto Dock open/close updates the cutout without resizing the site', async ({ page }) => {
-  await showNativeBrowser(page, { pageBar: 'auto' }, true);
+  await showNativeBrowserWithDockGeometry(page, { pageBar: 'auto' }, true);
   await expectNativeGeometry(page);
   const body = await page.locator('.bx-body').first().boundingBox();
   const closed = await page.locator('#dots').boundingBox();
@@ -136,7 +136,7 @@ for (const display of [
   { pageBar: 'dots' }, { pageBar: 'auto', pageBarSide: 'left' },
   { pageBar: 'auto', pageBarSide: 'right', controlsTop: true }, { pageBar: 'bar' },
 ]) test(`native browser uses the actual Dock rect: ${JSON.stringify(display)}`, async ({ page }) => {
-  await showNativeBrowser(page, display);
+  await showNativeBrowserWithDockGeometry(page, display);
   if (display.pageBar === 'auto') await page.locator('#dots .dot').first().click();
   await expectNativeGeometry(page);
   await page.setViewportSize({ width: 460, height: 720 });
@@ -148,7 +148,7 @@ for (const display of [
 });
 
 test('native browser geometry dedupes, follows page movement, hides, and distinguishes pages sharing a URL', async ({ page }) => {
-  await showNativeBrowser(page, { pageBar: 'dots' });
+  await showNativeBrowserWithDockGeometry(page, { pageBar: 'dots' });
   await expectNativeGeometry(page);
   const stable = await page.evaluate(async () => {
     const m = await import('/panel/main.js');
