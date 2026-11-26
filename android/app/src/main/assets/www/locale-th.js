@@ -4,7 +4,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
     "strings": {
       "s.phoneMic.title": "ไมค์ของโทรศัพท์",
       "s.phoneMic.enable": "ใช้ไมโครโฟนของโทรศัพท์เป็นไมโครโฟนของคอมพิวเตอร์",
-      "s.phoneMic.hint": "เสียงจากไมค์ของโทรศัพท์จะเล่นเข้าสายเสมือน เช่น VB-CABLE แล้วแอปจะเลือกปลายอีกด้านของสาย (CABLE Output) เป็นไมโครโฟน ปุ่มตั้งค่าจะตรวจสอบสาย ดาวน์โหลด scrcpy-server 5.0.1 จาก GitHub หากยังไม่มี แล้วเปิดไมค์ โทรศัพท์ต้องต่อผ่าน USB ตัวเลือกเพิ่มเติม: ขั้นสูง › JSON (phoneMic)",
+      "s.phoneMic.hint": "เสียงจากไมค์ของโทรศัพท์จะเล่นเข้าสายเสมือน เช่น VB-CABLE แล้วแอปจะเลือกปลายอีกด้านของสาย (CABLE Output) เป็นไมโครโฟน ปุ่มตั้งค่าจะตรวจสอบสาย ดาวน์โหลด scrcpy-server 5.0.1 จาก GitHub หากยังไม่มี แล้วเปิดไมค์ โทรศัพท์ต้องต่อผ่าน ADB ตัวเลือกเพิ่มเติม: ขั้นสูง › JSON (phoneMic)",
       "s.phoneMic.setup": "ตั้งค่า",
       "s.phoneMic.settingUp": "กำลังตั้งค่า…",
       "s.phoneMic.saveFirst": "บันทึกหรือย้อนการเปลี่ยนแปลงอื่นก่อน แล้วจึงกดตั้งค่า",

@@ -4,7 +4,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
     "strings": {
       "s.phoneMic.title": "手機麥克風",
       "s.phoneMic.enable": "將手機的麥克風當作電腦麥克風使用",
-      "s.phoneMic.hint": "手機麥克風的聲音會播放到虛擬音訊線(例如 VB-CABLE);應用程式選擇音訊線的另一端(CABLE Output)作為麥克風。「設定」會檢查音訊線,若缺少則從 GitHub 下載 scrcpy-server 5.0.1,然後開啟麥克風。手機須透過 USB 連接。更多選項:進階 › JSON(phoneMic)。",
+      "s.phoneMic.hint": "手機麥克風的聲音會播放到虛擬音訊線(例如 VB-CABLE);應用程式選擇音訊線的另一端(CABLE Output)作為麥克風。「設定」會檢查音訊線,若缺少則從 GitHub 下載 scrcpy-server 5.0.1,然後開啟麥克風。手機須透過 ADB 連接。更多選項:進階 › JSON(phoneMic)。",
       "s.phoneMic.setup": "設定",
       "s.phoneMic.settingUp": "正在設定…",
       "s.phoneMic.saveFirst": "請先儲存或還原其他變更,再按「設定」。",

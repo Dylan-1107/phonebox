@@ -51,7 +51,7 @@
       'phoneapps.needsApp': 'Open this page on the phone to see its apps',
       's.phoneMic.title': 'Phone mic',
       's.phoneMic.enable': 'Use the phone\'s microphone as a computer microphone',
-      's.phoneMic.hint': 'The phone\'s mic plays into a virtual cable such as VB-CABLE; apps pick the cable\'s other end (CABLE Output) as their microphone. Set up checks for the cable, downloads scrcpy-server 5.0.1 from GitHub if it is missing, and turns the mic on. The phone must be on USB. More options: Advanced › JSON (phoneMic).',
+      's.phoneMic.hint': 'The phone\'s mic plays into a virtual cable such as VB-CABLE; apps pick the cable\'s other end (CABLE Output) as their microphone. Set up checks for the cable, downloads scrcpy-server 5.0.1 from GitHub if it is missing, and turns the mic on. The phone must be connected through ADB. More options: Advanced › JSON (phoneMic).',
       's.phoneMic.setup': 'Set up',
       's.phoneMic.settingUp': 'Setting up…',
       's.phoneMic.saveFirst': 'Save or revert your other changes first, then press Set up.',
@@ -1065,7 +1065,7 @@
     tr: {
       's.phoneMic.title': 'Telefon mikrofonu',
       's.phoneMic.enable': 'Telefonun mikrofonunu bilgisayar mikrofonu olarak kullan',
-      's.phoneMic.hint': 'Telefonun mikrofonu VB-CABLE gibi sanal bir kabloya çalınır; uygulamalar kablonun diğer ucunu (CABLE Output) mikrofon olarak seçer. Kur, kabloyu denetler, eksikse scrcpy-server 5.0.1\'i GitHub\'dan indirir ve mikrofonu açar. Telefon USB ile bağlı olmalı. Diğer seçenekler: Gelişmiş › JSON (phoneMic).',
+      's.phoneMic.hint': 'Telefonun mikrofonu VB-CABLE gibi sanal bir kabloya çalınır; uygulamalar kablonun diğer ucunu (CABLE Output) mikrofon olarak seçer. Kur, kabloyu denetler, eksikse scrcpy-server 5.0.1\'i GitHub\'dan indirir ve mikrofonu açar. Telefon ADB ile bağlı olmalı. Diğer seçenekler: Gelişmiş › JSON (phoneMic).',
       's.phoneMic.setup': 'Kur',
       's.phoneMic.settingUp': 'Kuruluyor…',
       's.phoneMic.saveFirst': 'Önce diğer değişikliklerinizi kaydedin ya da geri alın, sonra Kur\'a basın.',
@@ -1632,7 +1632,7 @@
     de: {
       's.phoneMic.title': 'Telefonmikrofon',
       's.phoneMic.enable': 'Das Mikrofon des Telefons als Computermikrofon verwenden',
-      's.phoneMic.hint': 'Das Mikrofon des Telefons wird in ein virtuelles Kabel wie VB-CABLE abgespielt; Apps wählen das andere Ende des Kabels (CABLE Output) als Mikrofon. Einrichten prüft das Kabel, lädt scrcpy-server 5.0.1 von GitHub, falls er fehlt, und schaltet das Mikrofon ein. Das Telefon muss per USB verbunden sein. Weitere Optionen: Erweitert › JSON (phoneMic).',
+      's.phoneMic.hint': 'Das Mikrofon des Telefons wird in ein virtuelles Kabel wie VB-CABLE abgespielt; Apps wählen das andere Ende des Kabels (CABLE Output) als Mikrofon. Einrichten prüft das Kabel, lädt scrcpy-server 5.0.1 von GitHub, falls er fehlt, und schaltet das Mikrofon ein. Das Telefon muss per ADB verbunden sein. Weitere Optionen: Erweitert › JSON (phoneMic).',
       's.phoneMic.setup': 'Einrichten',
       's.phoneMic.settingUp': 'Wird eingerichtet…',
       's.phoneMic.saveFirst': 'Speichern oder verwerfen Sie zuerst Ihre anderen Änderungen und drücken Sie dann Einrichten.',
@@ -2190,7 +2190,7 @@
     fr: {
       's.phoneMic.title': 'Micro du téléphone',
       's.phoneMic.enable': 'Utiliser le micro du téléphone comme micro de l\'ordinateur',
-      's.phoneMic.hint': 'Le micro du téléphone est joué dans un câble virtuel comme VB-CABLE ; les applications choisissent l\'autre extrémité du câble (CABLE Output) comme micro. Configurer vérifie le câble, télécharge scrcpy-server 5.0.1 depuis GitHub s\'il manque et active le micro. Le téléphone doit être branché en USB. Autres options : Avancé › JSON (phoneMic).',
+      's.phoneMic.hint': 'Le micro du téléphone est joué dans un câble virtuel comme VB-CABLE ; les applications choisissent l\'autre extrémité du câble (CABLE Output) comme micro. Configurer vérifie le câble, télécharge scrcpy-server 5.0.1 depuis GitHub s\'il manque et active le micro. Le téléphone doit être branché en ADB. Autres options : Avancé › JSON (phoneMic).',
       's.phoneMic.setup': 'Configurer',
       's.phoneMic.settingUp': 'Configuration…',
       's.phoneMic.saveFirst': 'Enregistrez ou annulez d\'abord vos autres modifications, puis appuyez sur Configurer.',
@@ -2748,7 +2748,7 @@
     es: {
       's.phoneMic.title': 'Micrófono del teléfono',
       's.phoneMic.enable': 'Usar el micrófono del teléfono como micrófono del ordenador',
-      's.phoneMic.hint': 'El micrófono del teléfono se reproduce en un cable virtual como VB-CABLE; las aplicaciones eligen el otro extremo del cable (CABLE Output) como micrófono. Configurar comprueba el cable, descarga scrcpy-server 5.0.1 de GitHub si falta y activa el micrófono. El teléfono debe estar conectado por USB. Más opciones: Avanzado › JSON (phoneMic).',
+      's.phoneMic.hint': 'El micrófono del teléfono se reproduce en un cable virtual como VB-CABLE; las aplicaciones eligen el otro extremo del cable (CABLE Output) como micrófono. Configurar comprueba el cable, descarga scrcpy-server 5.0.1 de GitHub si falta y activa el micrófono. El teléfono debe estar conectado por ADB. Más opciones: Avanzado › JSON (phoneMic).',
       's.phoneMic.setup': 'Configurar',
       's.phoneMic.settingUp': 'Configurando…',
       's.phoneMic.saveFirst': 'Guarda o revierte primero tus otros cambios y luego pulsa Configurar.',
@@ -3306,7 +3306,7 @@
     it: {
       's.phoneMic.title': 'Microfono del telefono',
       's.phoneMic.enable': 'Usa il microfono del telefono come microfono del computer',
-      's.phoneMic.hint': 'Il microfono del telefono viene riprodotto in un cavo virtuale come VB-CABLE; le app scelgono l\'altra estremità del cavo (CABLE Output) come microfono. Configura controlla il cavo, scarica scrcpy-server 5.0.1 da GitHub se manca e attiva il microfono. Il telefono deve essere collegato via USB. Altre opzioni: Avanzate › JSON (phoneMic).',
+      's.phoneMic.hint': 'Il microfono del telefono viene riprodotto in un cavo virtuale come VB-CABLE; le app scelgono l\'altra estremità del cavo (CABLE Output) come microfono. Configura controlla il cavo, scarica scrcpy-server 5.0.1 da GitHub se manca e attiva il microfono. Il telefono deve essere collegato via ADB. Altre opzioni: Avanzate › JSON (phoneMic).',
       's.phoneMic.setup': 'Configura',
       's.phoneMic.settingUp': 'Configurazione…',
       's.phoneMic.saveFirst': 'Salva o annulla prima le altre modifiche, poi premi Configura.',
@@ -3864,7 +3864,7 @@
     pt: {
       's.phoneMic.title': 'Microfone do telemóvel',
       's.phoneMic.enable': 'Usar o microfone do telemóvel como microfone do computador',
-      's.phoneMic.hint': 'O microfone do telemóvel é reproduzido num cabo virtual como o VB-CABLE; as aplicações escolhem a outra ponta do cabo (CABLE Output) como microfone. Configurar verifica o cabo, transfere o scrcpy-server 5.0.1 do GitHub se faltar e liga o microfone. O telemóvel tem de estar ligado por USB. Mais opções: Avançado › JSON (phoneMic).',
+      's.phoneMic.hint': 'O microfone do telemóvel é reproduzido num cabo virtual como o VB-CABLE; as aplicações escolhem a outra ponta do cabo (CABLE Output) como microfone. Configurar verifica o cabo, transfere o scrcpy-server 5.0.1 do GitHub se faltar e liga o microfone. O telemóvel tem de estar ligado por ADB. Mais opções: Avançado › JSON (phoneMic).',
       's.phoneMic.setup': 'Configurar',
       's.phoneMic.settingUp': 'A configurar…',
       's.phoneMic.saveFirst': 'Guarde ou reverta primeiro as outras alterações e depois carregue em Configurar.',
@@ -4422,7 +4422,7 @@
     'pt-BR': {
       's.phoneMic.title': 'Microfone do celular',
       's.phoneMic.enable': 'Usar o microfone do celular como microfone do computador',
-      's.phoneMic.hint': 'O microfone do celular toca em um cabo virtual como o VB-CABLE; os apps escolhem a outra ponta do cabo (CABLE Output) como microfone. Configurar verifica o cabo, baixa o scrcpy-server 5.0.1 do GitHub se estiver faltando e liga o microfone. O celular precisa estar no USB. Mais opções: Avançado › JSON (phoneMic).',
+      's.phoneMic.hint': 'O microfone do celular toca em um cabo virtual como o VB-CABLE; os apps escolhem a outra ponta do cabo (CABLE Output) como microfone. Configurar verifica o cabo, baixa o scrcpy-server 5.0.1 do GitHub se estiver faltando e liga o microfone. O celular precisa estar no ADB. Mais opções: Avançado › JSON (phoneMic).',
       's.phoneMic.setup': 'Configurar',
       's.phoneMic.settingUp': 'Configurando…',
       's.phoneMic.saveFirst': 'Salve ou desfaça antes suas outras alterações e depois toque em Configurar.',
@@ -5408,7 +5408,7 @@
     nl: {
       's.phoneMic.title': 'Telefoonmicrofoon',
       's.phoneMic.enable': 'De microfoon van de telefoon als computermicrofoon gebruiken',
-      's.phoneMic.hint': 'De microfoon van de telefoon speelt af in een virtuele kabel zoals VB-CABLE; apps kiezen het andere eind van de kabel (CABLE Output) als microfoon. Instellen controleert de kabel, downloadt scrcpy-server 5.0.1 van GitHub als die ontbreekt en zet de microfoon aan. De telefoon moet via USB verbonden zijn. Meer opties: Geavanceerd › JSON (phoneMic).',
+      's.phoneMic.hint': 'De microfoon van de telefoon speelt af in een virtuele kabel zoals VB-CABLE; apps kiezen het andere eind van de kabel (CABLE Output) als microfoon. Instellen controleert de kabel, downloadt scrcpy-server 5.0.1 van GitHub als die ontbreekt en zet de microfoon aan. De telefoon moet via ADB verbonden zijn. Meer opties: Geavanceerd › JSON (phoneMic).',
       's.phoneMic.setup': 'Instellen',
       's.phoneMic.settingUp': 'Bezig met instellen…',
       's.phoneMic.saveFirst': 'Sla eerst je andere wijzigingen op of draai ze terug en druk dan op Instellen.',
@@ -5966,7 +5966,7 @@
     pl: {
       's.phoneMic.title': 'Mikrofon telefonu',
       's.phoneMic.enable': 'Używaj mikrofonu telefonu jako mikrofonu komputera',
-      's.phoneMic.hint': 'Mikrofon telefonu jest odtwarzany do wirtualnego kabla, takiego jak VB-CABLE; aplikacje wybierają drugi koniec kabla (CABLE Output) jako mikrofon. Konfiguruj sprawdza kabel, pobiera scrcpy-server 5.0.1 z GitHuba, jeśli go brakuje, i włącza mikrofon. Telefon musi być podłączony przez USB. Więcej opcji: Zaawansowane › JSON (phoneMic).',
+      's.phoneMic.hint': 'Mikrofon telefonu jest odtwarzany do wirtualnego kabla, takiego jak VB-CABLE; aplikacje wybierają drugi koniec kabla (CABLE Output) jako mikrofon. Konfiguruj sprawdza kabel, pobiera scrcpy-server 5.0.1 z GitHuba, jeśli go brakuje, i włącza mikrofon. Telefon musi być podłączony przez ADB. Więcej opcji: Zaawansowane › JSON (phoneMic).',
       's.phoneMic.setup': 'Konfiguruj',
       's.phoneMic.settingUp': 'Konfigurowanie…',
       's.phoneMic.saveFirst': 'Najpierw zapisz lub cofnij pozostałe zmiany, a potem naciśnij Konfiguruj.',
@@ -6524,7 +6524,7 @@
     ru: {
       's.phoneMic.title': 'Микрофон телефона',
       's.phoneMic.enable': 'Использовать микрофон телефона как микрофон компьютера',
-      's.phoneMic.hint': 'Звук с микрофона телефона воспроизводится в виртуальный кабель, например VB-CABLE; приложения выбирают другой конец кабеля (CABLE Output) как микрофон. «Настроить» проверяет кабель, скачивает scrcpy-server 5.0.1 с GitHub, если его нет, и включает микрофон. Телефон должен быть подключён по USB. Другие параметры: Дополнительно › JSON (phoneMic).',
+      's.phoneMic.hint': 'Звук с микрофона телефона воспроизводится в виртуальный кабель, например VB-CABLE; приложения выбирают другой конец кабеля (CABLE Output) как микрофон. «Настроить» проверяет кабель, скачивает scrcpy-server 5.0.1 с GitHub, если его нет, и включает микрофон. Телефон должен быть подключён по ADB. Другие параметры: Дополнительно › JSON (phoneMic).',
       's.phoneMic.setup': 'Настроить',
       's.phoneMic.settingUp': 'Настройка…',
       's.phoneMic.saveFirst': 'Сначала сохраните или отмените другие изменения, затем нажмите «Настроить».',
@@ -7082,7 +7082,7 @@
     el: {
       's.phoneMic.title': 'Μικρόφωνο τηλεφώνου',
       's.phoneMic.enable': 'Χρήση του μικροφώνου του τηλεφώνου ως μικρόφωνο του υπολογιστή',
-      's.phoneMic.hint': 'Το μικρόφωνο του τηλεφώνου αναπαράγεται σε ένα εικονικό καλώδιο όπως το VB-CABLE· οι εφαρμογές επιλέγουν την άλλη άκρη του καλωδίου (CABLE Output) ως μικρόφωνο. Η Ρύθμιση ελέγχει το καλώδιο, κατεβάζει το scrcpy-server 5.0.1 από το GitHub αν λείπει και ενεργοποιεί το μικρόφωνο. Το τηλέφωνο πρέπει να είναι συνδεδεμένο με USB. Περισσότερες επιλογές: Για προχωρημένους › JSON (phoneMic).',
+      's.phoneMic.hint': 'Το μικρόφωνο του τηλεφώνου αναπαράγεται σε ένα εικονικό καλώδιο όπως το VB-CABLE· οι εφαρμογές επιλέγουν την άλλη άκρη του καλωδίου (CABLE Output) ως μικρόφωνο. Η Ρύθμιση ελέγχει το καλώδιο, κατεβάζει το scrcpy-server 5.0.1 από το GitHub αν λείπει και ενεργοποιεί το μικρόφωνο. Το τηλέφωνο πρέπει να είναι συνδεδεμένο με ADB. Περισσότερες επιλογές: Για προχωρημένους › JSON (phoneMic).',
       's.phoneMic.setup': 'Ρύθμιση',
       's.phoneMic.settingUp': 'Γίνεται ρύθμιση…',
       's.phoneMic.saveFirst': 'Αποθηκεύστε ή αναιρέστε πρώτα τις άλλες αλλαγές σας και μετά πατήστε Ρύθμιση.',
@@ -8067,7 +8067,7 @@
     vi: {
       's.phoneMic.title': 'Mic điện thoại',
       's.phoneMic.enable': 'Dùng micro của điện thoại làm micro cho máy tính',
-      's.phoneMic.hint': 'Tiếng từ mic điện thoại được phát vào một cáp ảo như VB-CABLE; các ứng dụng chọn đầu kia của cáp (CABLE Output) làm micro. Nút Cài đặt kiểm tra cáp ảo, tải scrcpy-server 5.0.1 từ GitHub nếu chưa có, rồi bật mic. Điện thoại phải cắm qua USB. Thêm tùy chọn: Nâng cao › JSON (phoneMic).',
+      's.phoneMic.hint': 'Tiếng từ mic điện thoại được phát vào một cáp ảo như VB-CABLE; các ứng dụng chọn đầu kia của cáp (CABLE Output) làm micro. Nút Cài đặt kiểm tra cáp ảo, tải scrcpy-server 5.0.1 từ GitHub nếu chưa có, rồi bật mic. Điện thoại phải cắm qua ADB. Thêm tùy chọn: Nâng cao › JSON (phoneMic).',
       's.phoneMic.setup': 'Cài đặt',
       's.phoneMic.settingUp': 'Đang cài đặt…',
       's.phoneMic.saveFirst': 'Hãy lưu hoặc hoàn tác các thay đổi khác trước, rồi bấm Cài đặt.',
@@ -9044,7 +9044,7 @@
       'phoneapps.needsApp': '在平板上打开这一页才能看到应用',
       's.phoneMic.title': '手机麦克风',
       's.phoneMic.enable': '将手机的麦克风用作电脑麦克风',
-      's.phoneMic.hint': '手机麦克风的声音会播放到虚拟音频线(如 VB-CABLE)中;应用选择音频线的另一端(CABLE Output)作为麦克风。“设置”会检查音频线,如缺少则从 GitHub 下载 scrcpy-server 5.0.1,然后开启麦克风。手机须通过 USB 连接。更多选项:高级 › JSON(phoneMic)。',
+      's.phoneMic.hint': '手机麦克风的声音会播放到虚拟音频线(如 VB-CABLE)中;应用选择音频线的另一端(CABLE Output)作为麦克风。“设置”会检查音频线,如缺少则从 GitHub 下载 scrcpy-server 5.0.1,然后开启麦克风。手机须通过 ADB 连接。更多选项:高级 › JSON(phoneMic)。',
       's.phoneMic.setup': '设置',
       's.phoneMic.settingUp': '正在设置…',
       's.phoneMic.saveFirst': '请先保存或撤销其他更改,然后再点“设置”。',

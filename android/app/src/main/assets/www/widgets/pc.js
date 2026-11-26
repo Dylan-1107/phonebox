@@ -662,7 +662,10 @@ W['discord-bar'] = {
 // voice channels to join and recent notifications. Buttons only work when the widget allows control.
 W.discord = {
   needs: ['tick', 'fast'],
-  create(box, { o, page, w }) {
+  create(box, ctx) {
+    // 并排布局使用上方独立实现，默认列表保留原来的逻辑。
+    if (ctx.o.layout === 'focus') return dcFocus.create(box, ctx);
+    const { o, page, w } = ctx;
     let data = null, lastKey = '', busy = null;
     const open = new Set(); // servers whose channels are unfolded
     // Favourite servers and voice channels, picked on the phone (★): saved in this widget's options on the computer.

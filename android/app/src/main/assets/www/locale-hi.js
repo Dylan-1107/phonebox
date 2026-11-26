@@ -4,7 +4,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
     "strings": {
       "s.phoneMic.title": "फ़ोन माइक",
       "s.phoneMic.enable": "फ़ोन के माइक्रोफ़ोन को कंप्यूटर के माइक्रोफ़ोन की तरह इस्तेमाल करें",
-      "s.phoneMic.hint": "फ़ोन के माइक की आवाज़ VB-CABLE जैसी वर्चुअल केबल में चलाई जाती है; ऐप केबल के दूसरे सिरे (CABLE Output) को माइक्रोफ़ोन चुनते हैं। सेट अप केबल की जाँच करता है, scrcpy-server 5.0.1 न हो तो उसे GitHub से डाउनलोड करता है और माइक चालू करता है। फ़ोन USB से जुड़ा होना चाहिए। और विकल्प: उन्नत › JSON (phoneMic)।",
+      "s.phoneMic.hint": "फ़ोन के माइक की आवाज़ VB-CABLE जैसी वर्चुअल केबल में चलाई जाती है; ऐप केबल के दूसरे सिरे (CABLE Output) को माइक्रोफ़ोन चुनते हैं। सेट अप केबल की जाँच करता है, scrcpy-server 5.0.1 न हो तो उसे GitHub से डाउनलोड करता है और माइक चालू करता है। फ़ोन ADB से जुड़ा होना चाहिए। और विकल्प: उन्नत › JSON (phoneMic)।",
       "s.phoneMic.setup": "सेट अप करें",
       "s.phoneMic.settingUp": "सेट अप हो रहा है…",
       "s.phoneMic.saveFirst": "पहले अपने दूसरे बदलाव सहेजें या वापस लें, फिर सेट अप दबाएँ।",

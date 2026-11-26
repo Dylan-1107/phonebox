@@ -4,7 +4,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
     "strings": {
       "s.phoneMic.title": "ميكروفون الهاتف",
       "s.phoneMic.enable": "استخدام ميكروفون الهاتف كميكروفون للحاسوب",
-      "s.phoneMic.hint": "يُشغَّل صوت ميكروفون الهاتف في كابل افتراضي مثل VB-CABLE، وتختار التطبيقات الطرف الآخر من الكابل (CABLE Output) ميكروفونًا لها. يتحقق «الإعداد» من وجود الكابل، وينزّل scrcpy-server 5.0.1 من GitHub إن لم يكن موجودًا، ثم يشغّل الميكروفون. يجب توصيل الهاتف عبر USB. خيارات أخرى: متقدم › JSON (phoneMic).",
+      "s.phoneMic.hint": "يُشغَّل صوت ميكروفون الهاتف في كابل افتراضي مثل VB-CABLE، وتختار التطبيقات الطرف الآخر من الكابل (CABLE Output) ميكروفونًا لها. يتحقق «الإعداد» من وجود الكابل، وينزّل scrcpy-server 5.0.1 من GitHub إن لم يكن موجودًا، ثم يشغّل الميكروفون. يجب توصيل الهاتف عبر ADB. خيارات أخرى: متقدم › JSON (phoneMic).",
       "s.phoneMic.setup": "إعداد",
       "s.phoneMic.settingUp": "جارٍ الإعداد…",
       "s.phoneMic.saveFirst": "احفظ تغييراتك الأخرى أو تراجع عنها أولًا، ثم اضغط «إعداد».",

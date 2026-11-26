@@ -4,7 +4,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
     "strings": {
       "s.phoneMic.title": "Mikrofon ponsel",
       "s.phoneMic.enable": "Gunakan mikrofon ponsel sebagai mikrofon komputer",
-      "s.phoneMic.hint": "Mikrofon ponsel diputar ke kabel virtual seperti VB-CABLE; aplikasi memilih ujung kabel yang lain (CABLE Output) sebagai mikrofon. Siapkan memeriksa kabel, mengunduh scrcpy-server 5.0.1 dari GitHub jika belum ada, lalu menyalakan mikrofon. Ponsel harus terhubung lewat USB. Opsi lain: Lanjutan › JSON (phoneMic).",
+      "s.phoneMic.hint": "Mikrofon ponsel diputar ke kabel virtual seperti VB-CABLE; aplikasi memilih ujung kabel yang lain (CABLE Output) sebagai mikrofon. Siapkan memeriksa kabel, mengunduh scrcpy-server 5.0.1 dari GitHub jika belum ada, lalu menyalakan mikrofon. Ponsel harus terhubung lewat ADB. Opsi lain: Lanjutan › JSON (phoneMic).",
       "s.phoneMic.setup": "Siapkan",
       "s.phoneMic.settingUp": "Menyiapkan…",
       "s.phoneMic.saveFirst": "Simpan atau batalkan dulu perubahan lain, lalu tekan Siapkan.",

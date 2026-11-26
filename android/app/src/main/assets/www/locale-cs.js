@@ -4,7 +4,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
     "strings": {
       "s.phoneMic.title": "Mikrofon telefonu",
       "s.phoneMic.enable": "Používat mikrofon telefonu jako mikrofon počítače",
-      "s.phoneMic.hint": "Zvuk z mikrofonu telefonu se přehrává do virtuálního kabelu, například VB-CABLE; aplikace jako mikrofon vyberou druhý konec kabelu (CABLE Output). Nastavit zkontroluje kabel, stáhne scrcpy-server 5.0.1 z GitHubu, pokud chybí, a zapne mikrofon. Telefon musí být připojen přes USB. Další možnosti: Pokročilé › JSON (phoneMic).",
+      "s.phoneMic.hint": "Zvuk z mikrofonu telefonu se přehrává do virtuálního kabelu, například VB-CABLE; aplikace jako mikrofon vyberou druhý konec kabelu (CABLE Output). Nastavit zkontroluje kabel, stáhne scrcpy-server 5.0.1 z GitHubu, pokud chybí, a zapne mikrofon. Telefon musí být připojen přes ADB. Další možnosti: Pokročilé › JSON (phoneMic).",
       "s.phoneMic.setup": "Nastavit",
       "s.phoneMic.settingUp": "Nastavuje se…",
       "s.phoneMic.saveFirst": "Nejprve uložte nebo vraťte ostatní změny a pak stiskněte Nastavit.",
