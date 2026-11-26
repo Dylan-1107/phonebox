@@ -1,6 +1,7 @@
 // PhoneBox desk panel: core, pages, navigation and data from the agent. The widgets live in widgets/*.js;
 // they import what they need from here, so this module must not run code that needs them while it loads
 // (the start section at the end runs after every module has loaded).
+import { designGrid, gridForViewport, placeWidget, widgetsOnGrid } from './grid.js';
 import { W } from './registry.js';
 import './appearance.js';
 import { cached } from './widgets/helpers.js';
@@ -20,7 +21,8 @@ import './widgets/steam-library.js';
 import './widgets/lyrics.js';
 import './widgets/phoneapps.js';
 
-// PhoneBox desk panel. Pages are 12 × 6 grids of widgets, designed in the agent's settings page.
+// PhoneBox desk panel. Pages are grids of widgets, designed in the agent's settings page.
+// A phone is 12 × 6. A tablet keeps the 12 columns and adds rows, so the page holds more widgets.
 // The panel talks to the PhoneBox agent through "/agent/*", which the Android shell proxies over USB
 // (adb reverse) or Wi-Fi to the computer.
 
@@ -246,6 +248,15 @@ const ICONS = {
   err: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 8v4M12 16h.01',
   info: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01',
   monitor: 'M2 3h20v14H2zM8 21h8M12 17v4',
+  'mic-off': 'M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8|M3 3l18 18',
+  'headphone-off': 'M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3|M3 3l18 18',
+  'log-out': 'M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4|M10 17l-5-5 5-5|M5 12h12',
+  'chevron-down': 'm6 9 6 6 6-6',
+  'chevron-right': 'm9 18 6-6-6-6',
+  'arrow-left': 'M19 12H5|M12 19l-7-7 7-7',
+  'screen-share': 'M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3|M8 21h8|M12 17v4|M17 8l5-5|M17 3h5v5',
+  'screen-share-off': 'M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3|M8 21h8|M12 17v4|M22 3l-5 5|M17 3l5 5',
+  'external-link': 'M15 3h6v6|M10 14L21 3|M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6',
   pause: 'M6 4h4v16H6zM14 4h4v16h-4z',
   play: 'M6 3l14 9-14 9V3z',
   mic: 'M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8',
@@ -1434,7 +1445,7 @@ export function handleEvent(e) {
   else if (e.kind === 'reload') location.reload();
 }
 
-export const WIDGET_ICONS = { camera: '📹', dictate: '🎙️', spectrum: '📶', 'app-console': '🎛️', discord: '💬', steam: '👥', 'steam-activity': '🔔', rules: '⚡', chargecare: '🔋', nextup: '⏭️', moon: '🌙', wordclock: '🔤', clock: '🕒', weather: '⛅', forecast: '🌦️', media: '🎵', lyrics: '🎤', stat: '📈', gauge: '⏲️', chart: '📊', meters: '💾', gpu: '🎮', quotas: '✳️', sessions: '🤖',
+export const WIDGET_ICONS = { camera: '📹', dictate: '🎙️', spectrum: '📶', 'app-console': '🎛️', discord: '💬', 'discord-bar': '🔊', steam: '👥', 'steam-activity': '🔔', rules: '⚡', chargecare: '🔋', nextup: '⏭️', moon: '🌙', wordclock: '🔤', clock: '🕒', weather: '⛅', forecast: '🌦️', media: '🎵', lyrics: '🎤', stat: '📈', gauge: '⏲️', chart: '📊', meters: '💾', gpu: '🎮', quotas: '✳️', sessions: '🤖',
   github: '🐙', processes: '⚙️', shortcuts: '🎛️', button: '🔘', worldclock: '🌍', calendar: '📅', pomodoro: '🍅', countdown: '⏳', note: '📝', command: '💻',
   push: '📡', inbox: '📬', label: '🔤', analog: '🕰️', progress: '📆', stopwatch: '⏱️', timer: '⏲️', counter: '🔢', breathe: '🫁', quote: '💬',
   checklist: '✅', battery: '🔋', topprocs: '🔥', quotaring: '🎯', volume: '🔊', sun: '🌅', air: '🍃', hackernews: '📰', feeds: '🗞️', photos: '🖼️', exchange: '💱', crypto: '🪙', image: '🖼️', pcswitch: '🖥️', pagebuttons: '🧭', 'plex-queue': '🎛️', 'plex-playlists': '🎶' };
@@ -1449,10 +1460,11 @@ let lastHour12 = null;
 
 export const isPortrait = () => window.innerHeight > window.innerWidth * 1.05;
 
-// Portrait: the same widgets packed into a 6-column grid in reading order. Their sizes in cells stay the same
-// (portrait cells are about as square as landscape ones); wider widgets shrink to 6 columns and the rows grow to fit.
-export function portraitLayout(widgets) {
-  const cols = 6, occ = [], pos = new Map();
+// Portrait: the same widgets packed in reading order. Their sizes in cells stay the same (portrait cells are about
+// as square as landscape ones). A phone uses 6 columns, so a widget wider than that shrinks; a tablet uses 12,
+// so more widgets sit next to each other. The rows grow to fit.
+export function portraitLayout(widgets, cols = 6) {
+  const occ = [], pos = new Map();
   const free = (x, y, w, h) => { for (let r = y; r < y + h; r++) for (let c = x; c < x + w; c++) if (occ[r]?.[c]) return false; return true; };
   const take = (x, y, w, h) => { for (let r = y; r < y + h; r++) { occ[r] = occ[r] || []; for (let c = x; c < x + w; c++) occ[r][c] = true; } };
   for (const w of [...widgets].sort((a, b) => a.y - b.y || a.x - b.x)) {
@@ -1494,14 +1506,20 @@ const webResize = typeof ResizeObserver === 'function' ? new ResizeObserver(() =
 // A slow tick too: a rect can also change without a resize event (fonts, a token reflow); one comparison a
 // second is free and keeps the view from ever sitting a few pixels over the header row.
 setInterval(() => { if (webSlots.size) syncWebPage(); }, 1000);
+// Settings › Display › More rows on a tablet. Off by default, so an arranged tablet keeps its 12 × 6 pages.
+const gridOptions = () => ({ tabletRows: cfg.display?.tabletRows === true });
 
 export function buildLayout() {
   const enabled = (cfg.pages || []).filter((p) => p.enabled !== false && (webUrlOf(p) || Array.isArray(p.widgets)));
   const next = enabled.length ? enabled : FALLBACK_PAGES;
-  const portrait = isPortrait();
+  const viewport = gridForViewport(window.innerWidth, window.innerHeight, gridOptions());
+  const portrait = viewport.portrait;
+  const designed = designGrid(window.innerWidth, window.innerHeight, gridOptions());
+  document.documentElement.style.setProperty('--pb-cols', String(designed.cols));
+  document.documentElement.style.setProperty('--pb-rows', String(designed.rows));
   const h12 = hour12();
   // the active language belongs in the key: the widgets render their texts once, when they are created
-  const key = JSON.stringify([next, cfg.shortcuts, cfg.display?.showSeconds, cfg.display?.hour12, h12, cfg.display?.appearance, portrait, I18n?.getLang()]);
+  const key = JSON.stringify([next, cfg.shortcuts, cfg.display?.showSeconds, cfg.display?.hour12, h12, cfg.display?.appearance, viewport.cols, viewport.rows, designed.cols, designed.rows, portrait, I18n?.getLang()]);
   if (key === layoutKey) return;
   layoutKey = key;
   lastHour12 = h12;
@@ -1516,8 +1534,10 @@ export function buildLayout() {
     const grid = h('div', 'grid');
     const pageAppearance = PhoneBoxAppearance.resolve(cfg.display?.appearance, p.appearance);
     const list = Array.isArray(p.widgets) ? p.widgets : [];
-    const pl = portrait ? portraitLayout(list) : null;
-    if (pl) { grid.style.gridTemplateColumns = 'repeat(6, minmax(0, 1fr))'; grid.style.gridTemplateRows = `repeat(${pl.rows}, minmax(0, 1fr))`; }
+    // Upright, pack only the widgets this screen's landscape grid shows, so a phone leaves out tablet-only rows
+    // while a tablet held upright keeps them.
+    const pl = portrait ? portraitLayout(widgetsOnGrid(list, designed.cols, designed.rows), viewport.cols) : null;
+    if (pl) { grid.style.gridTemplateColumns = `repeat(${viewport.cols}, minmax(0, 1fr))`; grid.style.gridTemplateRows = `repeat(${pl.rows}, minmax(0, 1fr))`; }
     // A page of kind "web": one card like the Codex page's (the grid gives the same margins), a line of tabs for
     // the fixed sites, and the site area below. The app draws the site itself in a WebView over that area
     // (MainActivity.pageWeb); this card is what a browser preview shows.
@@ -1568,12 +1588,14 @@ export function buildLayout() {
     for (const w of list) {
       const def = W[w.type];
       if (!def) continue;
+      // not upright: the grid the CSS draws (--pb-rows), which on a nearly square screen can differ from the viewport's
+      const at = pl ? pl.pos.get(w) : placeWidget(w, designed.cols, designed.rows);
+      if (!at) continue; // a widget on a tablet-only row stays off a phone
       const box = h('div', `w w-${w.type}${def.bare ? ' bare' : ' card'}`);
       const appearance = PhoneBoxAppearance.resolve(cfg.display?.appearance, p.appearance, w.appearance);
-      const at = pl?.pos.get(w) || w;
       box.style.gridArea = `${at.y + 1} / ${at.x + 1} / span ${at.h} / span ${at.w}`;
       grid.appendChild(box);
-      const ctx = { page: p, w, o: w.options || {}, box, appearance };
+      const ctx = { page: p, w, o: w.options || {}, box, appearance, at, reflow: () => reflowPage(pi) };
       let inst;
       try { inst = def.create(box, ctx) || {}; } catch (e) { box.replaceChildren(h('div', 'empty', `${w.type}: ${e.message}`)); inst = {}; }
       PhoneBoxAppearance.widget(box, appearance);
@@ -1740,6 +1762,35 @@ export function buildDots() {
   dots.replaceChildren(...pages.map(dot), pageAllBtn, pagePauseBtn);
   dots.hidden = false;
   syncPagePauseUi();
+}
+
+/** A widget that hides itself (box.hidden, like the Discord bar outside a voice channel) gives its cells away: the
+ *  widgets right below it whose columns lie within its own grow up into its rows; with none below, the ones right above
+ *  grow down. Shown again, all go back to their own cells (every call starts again from each widget's own place). */
+export function reflowPage(pi) {
+  const items = mounted.filter((m) => m.pi === pi);
+  const area = new Map(items.map((m) => [m, { ...m.ctx.at }]));
+  const shown = items.filter((m) => !m.ctx.box.hidden);
+  // A neighbour that grows can reach the next hidden widget (two hidden bars stacked above a widget), so the hidden
+  // widgets are tried again until none is left or none moves.
+  let left = items.filter((m) => m.ctx.box.hidden);
+  for (let moved = true; moved && left.length;) {
+    moved = false;
+    left = left.filter((gone) => {
+      const g = gone.ctx.at;
+      const inside = (a) => a.x >= g.x && a.x + a.w <= g.x + g.w;
+      const below = shown.filter((m) => inside(area.get(m)) && area.get(m).y === g.y + g.h);
+      const above = shown.filter((m) => inside(area.get(m)) && area.get(m).y + area.get(m).h === g.y);
+      for (const m of below.length ? below : above) {
+        const a = area.get(m);
+        if (below.length) a.y = g.y;
+        a.h += g.h;
+      }
+      if (below.length || above.length) { moved = true; return false; }
+      return true;
+    });
+  }
+  for (const m of items) { const a = area.get(m); m.ctx.box.style.gridArea = `${a.y + 1} / ${a.x + 1} / span ${a.h} / span ${a.w}`; }
 }
 
 export function updateDots() {
@@ -2099,11 +2150,17 @@ export function openOverview() {
   haptic();
   const ov = $('overview');
   const tile = (p, i) => {
-    const map = h('div', 'ov-map', (p.widgets || []).map((w) => {
+    const g = designGrid(window.innerWidth, window.innerHeight, gridOptions());
+    const map = h('div', 'ov-map', (p.widgets || []).flatMap((w) => {
+      const at = placeWidget(w, g.cols, g.rows);
+      if (!at) return [];
       const b = h('span', null, emo(WIDGET_ICONS[w.type] || '◻'));
-      b.style.gridArea = `${w.y + 1} / ${w.x + 1} / span ${w.h} / span ${w.w}`;
-      return b;
+      b.style.gridArea = `${at.y + 1} / ${at.x + 1} / span ${at.h} / span ${at.w}`;
+      return [b];
     }));
+    // Tracks follow the same grid as the icons, even when the page layout was not rebuilt after a resize.
+    map.style.gridTemplateColumns = `repeat(${g.cols}, 1fr)`;
+    map.style.gridTemplateRows = `repeat(${g.rows}, 1fr)`;
     const t = h('button', 'ov-tile' + (i === curPage ? ' on' : ''), map, h('div', 'ov-name', h('b', null, `${i + 1}`), rich(` ${p.icon || ''} ${p.title}`)));
     t.addEventListener('click', (e) => { e.stopPropagation(); haptic(); closeOverview(); goPage(i, true); });
     return t;
@@ -3021,9 +3078,14 @@ function reportBattery() {
     const b = JSON.parse(bridge.battery());
     // the phone's view of its USB link lets the agent explain a cable that only charges (see UsbDoctor.cs)
     const usb = b.usb ? ['connected', 'configured', 'adb'].filter((k) => b.usb[k]).join(',') || 'none' : '';
-    if (b.level >= 0) api(`/phone/battery?level=${b.level}&plugged=${!!b.plugged}&temp=${b.temp || 0}&source=${b.source || ''}&usb=${usb}`, 'POST', 4000).catch(() => {});
+    if (b.level >= 0) api(`/phone/battery?level=${b.level}&plugged=${!!b.plugged}&temp=${b.temp || 0}&source=${b.source || ''}&usb=${usb}&viewWidth=${window.innerWidth}&viewHeight=${window.innerHeight}`, 'POST', 4000).catch(() => {});
   } catch (_) {}
 }
+let resizeReportTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeReportTimer);
+  resizeReportTimer = setTimeout(reportBattery, 300);
+});
 setInterval(reportBattery, 30_000);
 setTimeout(reportBattery, 5000);
 

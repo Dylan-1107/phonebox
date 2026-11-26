@@ -103,9 +103,15 @@ builder.Services.AddSingleton(sp => new LyricsService(sp.GetRequiredService<Conf
 AddMonitor<BatteryMonitor>(builder.Services);
 AddMonitor<RuleEngine>(builder.Services);
 AddMonitor<ChargeGuard>(builder.Services);
+// the phone's microphone into a virtual cable (off by default)
+AddMonitor<PhoneMic>(builder.Services);
 builder.Services.AddHostedService<Tray>();
 
 var app = builder.Build();
+{
+    // the phone acts on it through a shortcut command and reads it in /api/state (see PhoneDevices)
+    PhoneDevices.Mic = app.Services.GetRequiredService<PhoneMic>();
+}
 
 app.MapGet("/api/controls/state", async (ControlDeck deck, CancellationToken ct) => Results.Json(await deck.Snapshot(ct)));
 app.MapPost("/api/controls/command/{kind}", async (string kind, string? id, string? op, int? value, bool? muted,
@@ -522,10 +528,25 @@ app.MapGet("/api/info", (AdbReverse adb, ConfigStore cfg) => Results.Json(new
     webviewProblem = WebViewDoctor.DiagnoseRecent(PhoneRegistry.All(), DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
 }));
 
+// Phone mic status for the settings page and scripts (local port only: not a phone path, see Lan.AllowedOverLan).
+app.MapGet("/api/phone-mic", (PhoneMic mic) => Results.Json(new { mic = mic.Snapshot() }));
+app.MapPost("/api/phone-mic/mute", (bool? muted, PhoneMic mic) =>
+{
+    if (muted is null) mic.Toggle(); else mic.SetMuted(muted.Value);
+    return Results.Json(new { muted = mic.Muted });
+});
+// Set up: the only way the mic starts (the user presses it in the settings page; local port only).
+app.MapPost("/api/phone-mic/setup", async (ConfigStore cfg, CancellationToken ct) =>
+{
+    if (!OperatingSystem.IsWindows()) return Results.Json(new PhoneDeviceSetup.Result(false, "The phone mic needs Windows."));
+    using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(1) };
+    var r = await PhoneDeviceSetup.SetupMicAsync(cfg, PhoneDeviceSetup.PlaybackDevices, (url, t) => PhoneDeviceSetup.DownloadAsync(http, url, t), ct);
+    return Results.Json(r);
+});
 app.MapPost("/api/phone/open", async (AdbReverse adb) => { await adb.OpenPanelAsync(); return Results.Ok(); });
 
 // Widget types and page templates for the settings page's layout editor.
-app.MapGet("/api/catalog", () => Results.Text($"{{\"cols\":{Catalog.Cols},\"rows\":{Catalog.Rows},\"widgets\":{Catalog.WidgetsJson},\"templates\":{Catalog.TemplatesJson}}}",
+app.MapGet("/api/catalog", () => Results.Text($"{{\"cols\":{Catalog.Cols},\"rows\":{Catalog.Rows},\"maxRows\":{Catalog.MaxRows},\"widgets\":{Catalog.WidgetsJson},\"templates\":{Catalog.TemplatesJson}}}",
     "application/json; charset=utf-8"));
 
 // ---------------------------------------------------------------- webhook API: push data and events into the panel
@@ -591,6 +612,7 @@ object State(IServiceProvider sp, long? ev)
         obs = sp.GetRequiredService<ObsMonitor>().Snapshot() is { Connected: true } o ? new { o.Streaming, o.Recording, o.RecordPaused } : null,
         toggles = Shortcuts.States(sp.GetRequiredService<ConfigStore>().Get(), push, sp.GetRequiredService<AudioControl>()),
         cycles = Shortcuts.CycleStates(sp.GetRequiredService<ConfigStore>().Get()),
+        phoneMic = sp.GetRequiredService<PhoneMic>().PhoneState(),
     };
 }
 
@@ -698,6 +720,10 @@ app.MapGet("/api/discord", (DiscordMonitor dc, ConfigStore cfg) => Results.Json(
     snapshot = dc.Snapshot(),
     control = DiscordMonitor.ControlAllowed(cfg.Get()),
     share = DiscordMonitor.ShareWanted(cfg.Get()),
+    // the current-channel bar: whether you share (its Live badge and Stop), and whether join and the input mode are
+    // allowed beyond its own Control option (mute, deafen and leave only)
+    shareState = DiscordMonitor.ShareStateWanted(cfg.Get()),
+    joinControl = DiscordMonitor.ControlAllowed(cfg.Get(), "join"),
     widgetControl = DiscordMonitor.WidgetControl(cfg.Get()),
     chat = DiscordMonitor.ChatWanted(cfg.Get()),
     chatUnread = dc.ChatUnread(),
@@ -787,7 +813,12 @@ app.MapPost("/api/rules/test", (RuleConfig rule, RuleEngine rules) =>
 });
 
 // The phone reports its battery (charge guard); the settings show the guard's state and can switch the power to test it.
-app.MapPost("/api/phone/battery", (int level, bool plugged, double? temp, string? source, string? usb) => { ChargeGuard.Report(level, plugged, temp, source, usb); return Results.Ok(); });
+app.MapPost("/api/phone/battery", (HttpRequest request, int level, bool plugged, double? temp, string? source, string? usb, int? viewWidth, int? viewHeight) =>
+{
+    ChargeGuard.Report(level, plugged, temp, source, usb);
+    PhoneRegistry.SetViewport(request.Headers["X-PhoneBox-Device"].ToString(), viewWidth, viewHeight);
+    return Results.Ok();
+});
 app.MapGet("/api/charge", (ChargeGuard guard) => Results.Json(guard.Status()));
 app.MapPost("/api/charge/test", async (string action, ChargeGuard guard, ConfigStore cfg) =>
 {
@@ -922,6 +953,20 @@ app.MapGet("/api/codex/hook", () => Results.Json(new { installed = CodexHook.Ins
 app.MapPost("/api/codex/hook", (ConfigStore cfg) => CodexHook.Configure(true, Port, cfg.Get().Claude.TimeoutSec) is { } err ? Results.BadRequest(new { error = err }) : Results.Ok());
 app.MapDelete("/api/codex/hook", (ConfigStore cfg) => CodexHook.Configure(false, Port, cfg.Get().Claude.TimeoutSec) is { } err ? Results.BadRequest(new { error = err }) : Results.Ok());
 
+// WorkBuddy answers the same Claude-protocol PermissionRequest hook; its settings file is ~/.workbuddy/settings.json
+// and the endpoint is its own one, so WorkBuddy's prompts follow WorkBuddy's switches, not Claude's.
+app.MapPost(WorkBuddyHook.Endpoint, async (HttpRequest req, ConfigStore cfg, ApprovalStore approvals, SessionMonitor sessions) =>
+{
+    JsonElement input;
+    try { using var doc = await JsonDocument.ParseAsync(req.Body, cancellationToken: req.HttpContext.RequestAborted); input = doc.RootElement.Clone(); }
+    catch (JsonException) { return Results.Text(""); }
+    var output = await ClaudeHook.HandleWorkBuddyAsync(input, cfg, approvals, sessions, req.HttpContext.RequestAborted);
+    return output is null ? Results.Text("") : Results.Json(output);
+});
+app.MapGet("/api/workbuddy/hook", () => Results.Json(new { installed = WorkBuddyHook.Installed(), path = WorkBuddyHook.SettingsPath }));
+app.MapPost("/api/workbuddy/hook", (ConfigStore cfg) => WorkBuddyHook.Configure(true, Port, cfg.Get().WorkBuddy.TimeoutSec) is { } err ? Results.BadRequest(new { error = err }) : Results.Ok());
+app.MapDelete("/api/workbuddy/hook", (ConfigStore cfg) => WorkBuddyHook.Configure(false, Port, cfg.Get().WorkBuddy.TimeoutSec) is { } err ? Results.BadRequest(new { error = err }) : Results.Ok());
+
 // Permission prompts waiting for the phone (posted by an AI coding agent hook).
 app.MapGet("/api/approvals", (ApprovalStore a) => Results.Json(new { items = a.Snapshot() }));
 app.MapPost("/api/approvals/{id}", (string id, string decision, string? value, ApprovalStore a) =>
@@ -957,6 +1002,7 @@ app.MapGet("/api/phones", (ConfigStore cfg) =>
         lastSeen = s?.LastSeen,
         via = s?.Via,
         webView = s?.WebView,
+        viewport = s?.Viewport,
         webviewProblem = s is null ? null : WebViewDoctor.Diagnose(s.WebView, s.Model),
         name = c.Phones.FirstOrDefault(p => p.Id == id)?.Name,
         pages = c.Phones.FirstOrDefault(p => p.Id == id)?.Pages,
@@ -1234,4 +1280,3 @@ public partial class Program
             ? KeySender.AccessibilityHint
             : "The shortcut failed. The agent log on the computer has the details.";
 }
-

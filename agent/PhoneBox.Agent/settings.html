@@ -93,6 +93,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .pt-n { font-size: 11px; color: var(--muted); background: var(--panel-2); border-radius: 6px; padding: 0 6px; }
 .canvas-wrap { display: flex; justify-content: center; }
 .stage-bar { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; flex-wrap: wrap; }
+#screenHint { flex: 1 0 100%; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
 .seg button { border: 0; background: var(--panel); padding: 6px 13px; cursor: pointer; font: inherit; font-size: 13px; color: var(--text); }
 .seg button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
@@ -505,6 +506,13 @@ nav a.on::before { color: var(--accent); }
           <div id="stage">
             <div class="stage-bar">
               <div class="seg" id="stageSeg"><button data-v="layout" class="on" data-i18n="s.pages.layout">Layout</button><button data-v="live" data-i18n="s.pages.livePreview">Live preview</button></div>
+              <div class="seg" id="screenSeg" role="group" aria-label="Screen">
+                <button type="button" data-screen="phone" class="on" data-i18n="s.pages.screen.phone">Phone</button>
+                <button type="button" data-screen="tablet" data-i18n="s.pages.screen.tablet">Tablet</button>
+                <button type="button" data-screen="wide" data-i18n="s.pages.screen.wide">Wide tablet</button>
+              </div>
+              <span class="hint" id="screenHint" data-i18n="s.pages.screenHint">A phone page is 12 × 6. A tablet keeps the 12 columns and adds rows, so the page holds more widgets. Widgets below the top 6 rows stay on the tablet; a phone shows the top 6.</span>
+              <select class="preview-device" hidden></select>
               <span class="hint" id="stageHint"></span>
             </div>
             <div class="canvas-wrap"><div class="phone"><div class="canvas" id="canvas"></div><div class="preview" id="previewBox" hidden></div></div></div>
@@ -688,6 +696,16 @@ nav a.on::before { color: var(--accent); }
         <div class="row"><button class="btn sm" id="obsTest" data-i18n="s.test">Test</button><span class="hint" id="obsState"></span></div>
       </div>
 
+      <div class="card" id="phoneMicCard">
+        <h3 data-i18n="s.phoneMic.title">Phone mic</h3>
+        <div class="row" style="margin-bottom:8px"><label class="switch"><input type="checkbox" data-bind="phoneMic.enabled" aria-labelledby="phoneMicEnabledLabel"><span></span></label> <span id="phoneMicEnabledLabel" data-i18n="s.phoneMic.enable">Use the phone's microphone as a computer microphone</span></div>
+        <div class="row" style="margin-bottom:8px"><button class="btn sm" id="phoneMicSetup" data-setup="/api/phone-mic/setup" data-i18n="s.phoneMic.setup">Set up</button><span class="hint" id="phoneMicSetupState" aria-live="polite"></span></div>
+        <p class="hint" style="margin:0 0 12px" data-i18n="s.phoneMic.hint">The phone's mic plays into a virtual cable such as VB-CABLE; apps pick the cable's other end (CABLE Output) as their microphone. Set up checks for the cable, downloads scrcpy-server 5.0.1 from GitHub if it is missing, and turns the mic on. The phone must be connected through ADB. More options: Advanced › JSON (phoneMic).</p>
+        <div class="row" style="margin:4px 0 8px"><label class="switch"><input type="checkbox" data-bind="phoneMic.startMuted" aria-labelledby="phoneMicMutedLabel"><span></span></label> <span id="phoneMicMutedLabel" data-i18n="s.phoneMic.startMuted">Start muted</span></div>
+        <div class="row"><button class="btn sm" id="phoneMicMute" data-i18n="s.phoneMic.toggle">Mute / unmute</button><span class="hint" id="phoneMicState"></span></div>
+        <p class="hint" style="margin:6px 0 0" data-i18n="s.phoneMic.muteNote">Mute only silences the mic on this computer; while the phone mic is on, the phone keeps recording. Turn it off to stop recording.</p>
+      </div>
+
       <div class="card">
         <h3 data-i18n="s.night.title">Night mode</h3>
         <div class="row" style="margin-bottom:12px"><label class="switch"><input type="checkbox" data-bind="night.enabled"><span></span></label> <span data-i18n="s.night.enable">Dim the screen at night and show only the clock</span></div>
@@ -761,6 +779,8 @@ nav a.on::before { color: var(--accent); }
         <div class="field" style="max-width:420px"><label data-i18n="s.display.orientation">Orientation</label>
           <select data-bind="display.orientation"><option value="landscape" data-i18n="s.display.orientation.landscape">Landscape</option><option value="portrait" data-i18n="s.display.orientation.portrait">Portrait</option><option value="auto" data-i18n="s.display.orientation.auto">Follow the phone</option></select>
           <span class="hint" data-i18n="s.display.orientationHint">You design pages in landscape; in portrait the panel arranges the widgets by itself, top to bottom. Tablets use the same pages, just bigger.</span></div>
+        <label class="check"><input type="checkbox" data-bind="display.tabletRows" id="tabletRowsOpt"> <span data-i18n="s.display.tabletRows">More rows on a tablet</span></label>
+        <span class="hint" style="display:block;margin:-4px 0 10px" data-i18n="s.display.tabletRowsHint">A landscape tablet keeps the 12 columns and gets more rows (about 8 to 10, from its screen), so a page holds more widgets; upright, it packs 12 across. Widgets below the top 6 rows show only on a tablet: a phone leaves them out without a sign. Update the PhoneBox app on the tablet first, as an older app squeezes those widgets onto extra rows.</span>
         <div class="field" style="max-width:420px"><label data-i18n="s.display.timeFormat">Time format</label>
           <select data-bind="display.hour12" data-type="hour12"><option value="false" data-i18n="s.display.h24">24-hour (14:05)</option><option value="true" data-i18n="s.display.h12">12-hour (2:05 PM)</option><option value="auto" data-i18n="s.display.orientation.auto">Follow the phone</option></select></div>
         <label class="check"><input type="checkbox" data-bind="display.showSeconds"> <span data-i18n="s.display.showSeconds">Show seconds on the clock</span></label>
@@ -860,6 +880,13 @@ nav a.on::before { color: var(--accent); }
         <label class="check"><input type="checkbox" data-bind="claude.onlyWhenAway"> <span data-i18n="s.claude.onlyWhenAway">Only when I am away from the PC (no keyboard or mouse for a minute)</span></label>
         <label class="check"><input type="checkbox" data-bind="claude.shareConversation"> <span data-i18n="s.claude.shareConversation">Show the conversation on the phone (tap a Claude Code session to see its recent messages and steps; these are your prompts and Claude's replies, sent only to your phone)</span></label>
         <div class="field" style="max-width:260px;margin-top:12px"><label data-i18n="s.claude.timeout">Seconds to answer before the terminal takes over</label><input type="number" min="10" max="3600" data-bind="claude.timeoutSec" data-type="int"></div>
+
+        <div class="row" style="margin:14px 0 8px"><b style="min-width:92px">WorkBuddy</b><button class="btn" id="workbuddyHookBtn" data-i18n="s.claude.installHook">Install hook</button><span class="hint" id="workbuddyHookState"></span></div>
+        <label class="check"><input type="checkbox" data-bind="workBuddy.phoneApprovals"> <span data-i18n="s.claude.askOnPhone">Ask on the phone</span></label>
+        <label class="check"><input type="checkbox" data-bind="workBuddy.onlyWhenAway"> <span data-i18n="s.claude.onlyWhenAway">Only when I am away from the PC (no keyboard or mouse for a minute)</span></label>
+        <div class="field" style="max-width:260px;margin-top:12px"><label for="workBuddyTimeout" data-i18n="s.claude.timeout">Seconds to answer before the terminal takes over</label><input id="workBuddyTimeout" type="number" min="10" max="3600" data-bind="workBuddy.timeoutSec" data-type="int"></div>
+        <p class="hint" data-i18n="s.claude.timeoutReinstall">Each hook keeps the seconds it was installed with: after changing them, remove the hook and install it again.</p>
+        <label class="check"><input type="checkbox" data-bind="workBuddy.sessions"> <span data-i18n="s.workbuddy.sessions">Show WorkBuddy sessions</span></label>
 
         <div class="row" style="margin:14px 0 4px"><b style="min-width:92px">OpenCode</b></div>
         <p class="hint" style="margin:-2px 0 12px 100px" data-i18n="s.opencode.hint">OpenCode permission prompts and agent questions reach the phone while its background service is running. Off until you turn it on here. Allow always saves the requested pattern for the project, so it arms only after a short countdown.</p>
@@ -1221,6 +1248,7 @@ const PRESETS = [
   ['builtin:monitor-off', 'Built-in: turn monitors off'],
   ['builtin:lock', 'Built-in: lock the PC'],
   ['builtin:wake', 'Built-in: wake a computer (Wake-on-LAN; args: MAC)'],
+  ['builtin:phone-mic', 'Built-in: phone mic mute / unmute (args: mute or unmute to set it)'],
 ];
 
 let cfg = null;        // settings being edited
@@ -1254,7 +1282,55 @@ function changed() {
 }
 
 // ---------------------------------------------------------------- pages: visual layout editor
-let catalog = { cols: 12, rows: 6, widgets: [], templates: [] };
+let catalog = { cols: 12, rows: 6, maxRows: 18, widgets: [], templates: [] };
+// Keep these in step with grid.js: phone 780×360 → 12×6, Nexus 9 / 4:3 1024×768 → 12×10, 16:10 1280×800 → 12×8.
+const EDITOR_SCREENS = {
+  phone: { cols: 12, rows: 6, aspect: 752 / 333, previewW: 780, previewH: 360 },
+  tablet: { cols: 12, rows: 10, aspect: 4 / 3, previewW: 1024, previewH: 768 },
+  wide: { cols: 12, rows: 8, aspect: 16 / 10, previewW: 1280, previewH: 800 },
+};
+let editorScreenId = 'phone';
+try { editorScreenId = localStorage.getItem('pb-editor-screen') || 'phone'; } catch (_) {}
+if (!EDITOR_SCREENS[editorScreenId]) editorScreenId = 'phone';
+// Without Settings › Display › More rows on a tablet, every screen shows the phone page, so the editor does too.
+const tabletRowsOn = () => cfg?.display?.tabletRows === true;
+const editorScreen = () => EDITOR_SCREENS[tabletRowsOn() ? editorScreenId : 'phone'];
+let previewPhones = [], previewDeviceId = '', automaticPreviewDeviceId = '';
+function previewViewport(fallback) {
+  const phone = previewPhones.find(p => p.id === (previewDeviceId || automaticPreviewDeviceId));
+  return phone?.viewport ?? { width: fallback.previewW, height: fallback.previewH };
+}
+
+function syncPreviewDeviceSelectors() {
+  for (const select of document.querySelectorAll('.preview-device')) {
+    select.hidden = !previewPhones.length || (select.closest('#stage') && stageMode !== 'live');
+    select.setAttribute('aria-label', t('s.phones.title'));
+    select.replaceChildren(h('option', { value: '' }, tl('Automatic')),
+      ...previewPhones.map(p => h('option', { value: p.id }, p.name || p.model || p.id)));
+    select.value = previewDeviceId;
+    select.onchange = () => {
+      previewDeviceId = select.value;
+      syncPreviewViewports();
+    };
+  }
+}
+
+function syncPreviewViewports() {
+  syncPreviewDeviceSelectors();
+  fitPreview();
+  fitAppearancePreview();
+}
+
+function fitPreviewFrame(container, frame, viewport) {
+  if (!frame) return;
+  const { width, height } = viewport;
+  container.style.aspectRatio = `${width} / ${height}`;
+  frame.style.width = width + 'px';
+  frame.style.height = height + 'px';
+  frame.style.transform = `scale(${container.clientWidth / width})`;
+}
+const gridCols = () => editorScreen().cols;
+const gridRows = () => editorScreen().rows;
 let selPage = 0;
 let selWidget = -1;
 let activeStackSubIdx = -1;
@@ -1361,8 +1437,8 @@ function overlaps(page, w, x, y, ww, hh) {
 function freeSpot(page, ww, hh, minW, minH) {
   for (let h2 = hh; h2 >= Math.min(minH, hh); h2--)
     for (let w2 = ww; w2 >= Math.min(minW, ww); w2--)
-      for (let y = 0; y + h2 <= catalog.rows; y++)
-        for (let x = 0; x + w2 <= catalog.cols; x++)
+      for (let y = 0; y + h2 <= gridRows(); y++)
+        for (let x = 0; x + w2 <= gridCols(); x++)
           if (!overlaps(page, null, x, y, w2, h2)) return { x, y, w: w2, h: h2 };
   return null;
 }
@@ -1387,10 +1463,11 @@ function fitPages(pages) {
     for (const w of p.widgets) {
       if (typeof w.id !== 'string') w.id = '';
       const d = widgetDef(w.type);
-      w.w = gridNum(w.w, Math.min(d.minW, catalog.cols), catalog.cols, d.w);
-      w.h = gridNum(w.h, Math.min(d.minH, catalog.rows), catalog.rows, d.h);
-      w.x = gridNum(w.x, 0, catalog.cols - w.w, 0);
-      w.y = gridNum(w.y, 0, catalog.rows - w.h, 0);
+      const cols = catalog.cols || 12, rows = catalog.maxRows || 18;
+      w.w = gridNum(w.w, Math.min(d.minW, cols), cols, d.w);
+      w.h = gridNum(w.h, Math.min(d.minH, rows), rows, d.h);
+      w.x = gridNum(w.x, 0, cols - w.w, 0);
+      w.y = gridNum(w.y, 0, rows - w.h, 0);
     }
   }
   return list;
@@ -1530,14 +1607,16 @@ function setStage(mode) {
   $('canvas').hidden = live;
   $('previewBox').hidden = !live;
   $('pageEditor').classList.toggle('live', live);
+  const device = $('stage').querySelector('.preview-device');
+  device.hidden = !live || !previewPhones.length;
   updateStageText();
   if (live && !previewFrame) {
     previewFrame = h('iframe', { src: '../panel/?preview=1' });
     updateStageText();
     $('previewBox').appendChild(previewFrame);
-    const fit = () => { previewFrame.style.transform = `scale(${$('previewBox').clientWidth / 780})`; };
-    new ResizeObserver(fit).observe($('previewBox'));
-    fit();
+    applyEditorScreen();
+    new ResizeObserver(fitPreview).observe($('previewBox'));
+    fitPreview();
   }
   if (live) queuePreview();
 }
@@ -1567,6 +1646,15 @@ window.addEventListener('message', (e) => {
   sendPreview();
 });
 for (const b of $('stageSeg').children) b.onclick = () => setStage(b.dataset.v);
+$('tabletRowsOpt')?.addEventListener('change', () => { if (cfg) { renderCanvas(); if (selWidget >= 0) renderInspector(); } });
+for (const b of $('screenSeg').children) b.onclick = () => {
+  if (!EDITOR_SCREENS[b.dataset.screen]) return;
+  editorScreenId = b.dataset.screen;
+  try { localStorage.setItem('pb-editor-screen', editorScreenId); } catch (_) {}
+  if (!cfg) { applyEditorScreen(); return; }
+  renderCanvas();
+  if (selWidget >= 0) renderInspector();
+};
 setStage(stageMode);
 
 function renderTabsOnly() {
@@ -1580,17 +1668,44 @@ function renderTabsOnly() {
   });
 }
 
+function applyEditorScreen() {
+  const s = editorScreen();
+  const canvas = $('canvas');
+  if (canvas) {
+    canvas.style.aspectRatio = String(s.aspect);
+    canvas.style.gridTemplateColumns = `repeat(${s.cols}, 1fr)`;
+    canvas.style.gridTemplateRows = `repeat(${s.rows}, 1fr)`;
+  }
+  fitPreview();
+  const seg = $('screenSeg');
+  if (seg) {
+    seg.hidden = !tabletRowsOn();
+    for (const b of seg.children) b.classList.toggle('on', b.dataset.screen === editorScreenId);
+  }
+  const screenHint = $('screenHint');
+  if (screenHint) screenHint.hidden = !tabletRowsOn();
+}
+
+function fitPreview() {
+  fitPreviewFrame($('previewBox'), previewFrame, previewViewport(editorScreen()));
+}
+
 function renderCanvas() {
   const canvas = $('canvas'), p = curPage();
   if (!canvas || !p) return;
+  applyEditorScreen();
+  const cols = gridCols(), rows = gridRows();
   canvas.replaceChildren();
-  for (let i = 0; i < catalog.cols * catalog.rows; i++) canvas.appendChild(h('div', { class: 'cell' }));
+  for (let i = 0; i < cols * rows; i++) canvas.appendChild(h('div', { class: 'cell' }));
+  let hidden = 0;
   p.widgets.forEach((w, i) => {
+    if (w.x >= cols || w.y >= rows) { hidden++; return; }
+    const ww = Math.min(w.w, cols - w.x), hh = Math.min(w.h, rows - w.y);
     const d = widgetDef(w.type);
-    const el = h('div', { class: 'wb' + (i === selWidget ? ' sel' : ''), title: d.name },
+    const el = h('div', { class: 'wb' + (i === selWidget ? ' sel' : ''), title: d.name, 'data-i': String(i) },
       h('div', { class: 'wb-in' }, h('span', { class: 'wb-ico' }, rich(d.icon)), h('b', {}, d.name), h('small', {}, widgetSummary(w))),
       h('span', { class: 'rz', title: 'Resize' }));
-    el.style.gridArea = `${w.y + 1} / ${w.x + 1} / span ${w.h} / span ${w.w}`;
+    el.style.gridArea = `${w.y + 1} / ${w.x + 1} / span ${hh} / span ${ww}`;
     el.addEventListener('pointerdown', (e) => startDrag(e, w, i, e.target.classList.contains('rz') ? 'resize' : 'move'));
 
     if (w.type === 'stack') {
@@ -1621,26 +1736,39 @@ function renderCanvas() {
 
     canvas.appendChild(el);
   });
+  const hint = $('screenHint');
+  if (hint) hint.hidden = !tabletRowsOn() && !hidden; // widgets left on tablet rows still get counted with the setting off
+  if (hint) hint.textContent = t('s.pages.screenHint') + ' ' + t('s.pages.screenRowsVary') + (hidden ? ' ' + t('s.pages.screenHidden', { n: hidden }) : '');
 }
 
 function startDrag(e, w, i, mode) {
   e.preventDefault();
   const canvas = $('canvas'), p = curPage(), d = widgetDef(w.type);
   const r = canvas.getBoundingClientRect();
-  const cw = r.width / catalog.cols, ch = r.height / catalog.rows;
+  const cols = gridCols(), rows = gridRows();
+  const cw = r.width / cols, ch = r.height / rows;
   const sx = e.clientX, sy = e.clientY, s = { ...w };
   let moved = false;
   if (selWidget !== i) { selWidget = i; renderInspector(); }
-  canvas.querySelectorAll('.wb').forEach((b, j) => b.classList.toggle('sel', j === i));
-  const el = canvas.querySelectorAll('.wb')[i];
+  canvas.querySelectorAll('.wb').forEach((b) => b.classList.toggle('sel', b.dataset.i === String(i)));
+  const el = canvas.querySelector(`.wb[data-i="${i}"]`);
   const onMove = (ev) => {
     const dx = Math.round((ev.clientX - sx) / cw), dy = Math.round((ev.clientY - sy) / ch);
     let { x, y, w: ww, h: hh } = s;
-    if (mode === 'move') { x = Math.max(0, Math.min(catalog.cols - ww, s.x + dx)); y = Math.max(0, Math.min(catalog.rows - hh, s.y + dy)); }
-    else { ww = Math.max(Math.min(d.minW, catalog.cols), Math.min(catalog.cols - s.x, s.w + dx)); hh = Math.max(Math.min(d.minH, catalog.rows), Math.min(catalog.rows - s.y, s.h + dy)); }
+    // Only clamp the axis the pointer moved. A widget that runs onto rows this view does not show is drawn clipped,
+    // and its saved place there belongs to a taller screen: it does not move or resize vertically here, because
+    // clamping it to the visible rows would quietly move or shorten it on the tablet.
+    const clipped = s.y + s.h > rows;
+    if (mode === 'move') {
+      if (dx) x = Math.max(0, Math.min(cols - ww, s.x + dx));
+      if (dy && !clipped) y = Math.max(0, Math.min(rows - hh, s.y + dy));
+    } else {
+      if (dx) ww = Math.max(Math.min(d.minW, cols), Math.min(cols - s.x, s.w + dx));
+      if (dy && !clipped) hh = Math.max(Math.min(d.minH, rows), Math.min(rows - s.y, s.h + dy));
+    }
     if ((x !== w.x || y !== w.y || ww !== w.w || hh !== w.h) && !overlaps(p, w, x, y, ww, hh)) {
       Object.assign(w, { x, y, w: ww, h: hh });
-      el.style.gridArea = `${y + 1} / ${x + 1} / span ${hh} / span ${ww}`;
+      el.style.gridArea = `${y + 1} / ${x + 1} / span ${Math.max(1, Math.min(hh, rows - y))} / span ${Math.max(1, Math.min(ww, cols - x))}`;
       moved = true;
     }
   };
@@ -1693,7 +1821,9 @@ function renderInspector() {
     h('input', { type: 'number', min, max, value: w[key], onchange: (e) => {
       const v = Math.max(min, Math.min(max, parseInt(e.target.value || '0', 10)));
       const n = { x: w.x, y: w.y, w: w.w, h: w.h, [key]: v };
-      if (n.x + n.w > catalog.cols || n.y + n.h > catalog.rows || overlaps(p, w, n.x, n.y, n.w, n.h)) { toast(t('s.js.doesNotFit'), true); e.target.value = w[key]; return; }
+      // Check the axis being edited: a widget clipped by this view (it runs onto tablet rows) can still change its column.
+      const horizontal = key === 'x' || key === 'w';
+      if ((horizontal ? n.x + n.w > gridCols() : n.y + n.h > gridRows()) || overlaps(p, w, n.x, n.y, n.w, n.h)) { toast(t('s.js.doesNotFit'), true); e.target.value = w[key]; return; }
       w[key] = v; changed(); renderCanvas();
     } }));
   box.replaceChildren(
@@ -1709,8 +1839,8 @@ function renderInspector() {
     h('p', { class: 'hint', style: { margin: '0 0 12px' } }, d.desc),
     ...d.options.filter((o) => optionShown(w, d, o)).flatMap((o) => [...(o.section ? [h('h4', { class: 'opt-section' }, o.section)] : []), optionField(w, o)]),
     appearanceEditor(w, () => [cfg.display?.appearance, p.appearance], t('s.js.widgetAppearance'), true),
-    h('div', { class: 'row', style: { gap: '8px' } }, num('x', t('s.js.col'), 0, catalog.cols - 1), num('y', t('s.js.row'), 0, catalog.rows - 1),
-      num('w', t('s.js.width'), d.minW, catalog.cols), num('h', t('s.js.height'), d.minH, catalog.rows)));
+    h('div', { class: 'row', style: { gap: '8px' } }, num('x', t('s.js.col'), 0, gridCols() - 1), num('y', t('s.js.row'), 0, gridRows() - 1),
+      num('w', t('s.js.width'), d.minW, gridCols()), num('h', t('s.js.height'), d.minH, gridRows())));
 }
 
 function renderStackWidgetsOption(w, o) {
@@ -2302,10 +2432,19 @@ async function pairOverWifi() {
 
 // ---------------------------------------------------------------- phones
 let phonesSeen = [];
-async function loadPhones() {
+async function loadPhones(renderList = true) {
   try { phonesSeen = await (await fetch('/api/phones')).json(); } catch (_) { return; }
-  renderPhones();
+  previewPhones = phonesSeen.filter(p => p.viewport && Date.now() - p.lastSeen < 45_000);
+  if (!previewPhones.some(p => p.id === previewDeviceId)) previewDeviceId = '';
+  if (!previewPhones.some(p => p.id === automaticPreviewDeviceId))
+    automaticPreviewDeviceId = previewPhones[0]?.id ?? '';
+  syncPreviewViewports();
+  if (renderList) renderPhones();
 }
+
+setInterval(() => {
+  if (stageMode === 'live' || appearancePreviewFrame?.parentElement?.hidden === false) loadPhones(false);
+}, 5000);
 function renderPhones() {
   cfg.phones ??= [];
   const ago = (ms) => { if (!ms) return 'not seen since the agent started'; const s = (Date.now() - ms) / 1000; return s < 15 ? 'connected now' : s < 3600 ? `seen ${Math.round(s / 60)} min ago` : `seen ${Math.round(s / 3600)} h ago`; };
@@ -2476,6 +2615,42 @@ $('haTest').onclick = async () => {
     $('haState').textContent = r.result;
   } catch (_) { $('haState').textContent = 'Could not check'; }
 };
+// Phone mic: live state under the settings (Windows only; the agent leaves it off elsewhere).
+async function renderPhoneMicState() {
+  if (document.hidden || !$('phoneMicState')) return;
+  try {
+    const r = await (await fetch('/api/phone-mic', { cache: 'no-store' })).json();
+    const m = r.mic;
+    const parts = [m.output && m.state === 'live' ? m.text + ' → ' + m.output : m.text];
+    if (m.problem) parts.push(m.problem);
+    if (m.outputProblem && m.enabled) parts.push(m.outputProblem);
+    if (m.reconnects) parts.push(t('s.phoneMic.reconnects', { n: m.reconnects, ms: m.lastRecoveryMs }));
+    $('phoneMicState').textContent = parts.join(' · ');
+    $('phoneMicMute').disabled = !m.enabled;
+  } catch (_) { $('phoneMicState').textContent = ''; }
+}
+// Set up (the only thing that turns the mic on besides its switch): runs on the agent, which saves the settings
+// itself, so the page reloads them afterwards; unsaved edits would be lost, so it asks for a save first.
+for (const id of ['phoneMicSetup']) {
+  $(id).onclick = async () => {
+    const b = $(id), out = $(id + 'State');
+    if (JSON.stringify(cfg) !== saved) { out.textContent = t('s.phoneMic.saveFirst'); return; }
+    b.disabled = true; out.textContent = t('s.phoneMic.settingUp');
+    try {
+      const r = await (await fetch(b.dataset.setup, { method: 'POST' })).json();
+      out.textContent = r.message;
+      // reloaded only when nothing was changed while Set up ran: those edits stay, and saving them reports the conflict
+      if (r.ok && JSON.stringify(cfg) === saved) { await load(); $(id + 'State').textContent = r.message; }
+    } catch (_) { out.textContent = t('s.phoneMic.setupFailed'); }
+    b.disabled = false;
+  };
+}
+$('phoneMicMute').onclick = async () => {
+  try { await fetch('/api/phone-mic/mute', { method: 'POST' }); } catch (_) {}
+  renderPhoneMicState();
+};
+setInterval(renderPhoneMicState, 2000);
+
 $('obsTest').onclick = async () => {
   $('obsState').textContent = 'connecting…';
   try {
@@ -2776,7 +2951,7 @@ const RULE_PRESETS = [
 let activeRules = [];
 
 function renderRules() {
-  cfg.rules ??= []; cfg.calendars ??= []; cfg.feeds ??= []; cfg.cameras ??= { ffmpeg: '', sources: [] }; cfg.photos ??= { source: 'folder', folder: '', subfolders: true, immichUrl: '', immichKey: '', immichAlbum: '', immichAlbumName: '' }; cfg.console ??= { profiles: [] }; cfg.phones ??= []; cfg.homeAssistant ??= {}; cfg.obs ??= { enabled: false, url: 'ws://127.0.0.1:4455' }; cfg.discord ??= { enabled: false }; cfg.steam ??= { enabled: false };
+  cfg.rules ??= []; cfg.calendars ??= []; cfg.feeds ??= []; cfg.cameras ??= { ffmpeg: '', sources: [] }; cfg.photos ??= { source: 'folder', folder: '', subfolders: true, immichUrl: '', immichKey: '', immichAlbum: '', immichAlbumName: '' }; cfg.console ??= { profiles: [] }; cfg.phones ??= []; cfg.homeAssistant ??= {}; cfg.obs ??= { enabled: false, url: 'ws://127.0.0.1:4455' }; cfg.phoneMic ??= { enabled: false, source: 'mic-camcorder', endpoint: 'CABLE Input', latencyMs: 50, maxBufferMs: 150, gain: 1, serverPath: null, startMuted: false }; cfg.discord ??= { enabled: false }; cfg.steam ??= { enabled: false };
   $('rulePresets').replaceChildren(...RULE_PRESETS.map(([label, make]) => h('button', { class: 'btn', onclick: () => {
     cfg.rules.push({ id: '', enabled: true, ...make() });
     renderRules(); changed();
@@ -3587,6 +3762,11 @@ function appearanceEditor(owner, parents, label, widget = false) {
   render(); return root;
 }
 
+function fitAppearancePreview() {
+  if (appearancePreviewFrame)
+    fitPreviewFrame(appearancePreviewFrame.parentElement, appearancePreviewFrame, previewViewport(EDITOR_SCREENS.phone));
+}
+
 function renderAppearanceSettings() {
   const root = $('appearanceSettings');
   appearancePreviewObserver?.disconnect();
@@ -3602,14 +3782,16 @@ function renderAppearanceSettings() {
     if (!appearancePreviewFrame && !preview.hidden) {
       appearancePreviewFrame = h('iframe', { src: '../panel/?preview=1', title: 'Live appearance preview' });
       preview.append(appearancePreviewFrame);
-      const frame = appearancePreviewFrame;
-      appearancePreviewObserver = new ResizeObserver(() => { frame.style.transform = 'scale(' + preview.clientWidth / 780 + ')'; });
+      appearancePreviewObserver = new ResizeObserver(fitAppearancePreview);
       appearancePreviewObserver.observe(preview);
+      fitAppearancePreview();
     }
     queuePreview();
   } }, t('s.appearance.showPreview'));
   root.replaceChildren(h('h3', {}, t('s.appearance.title')), h('p', { class: 'hint' }, t('s.ap.lead')),
-    editor, h('div', { class: 'row', style: { gap: '10px', marginBottom: '12px' } }, selector, toggle), preview);
+    editor, h('div', { class: 'row', style: { gap: '10px', marginBottom: '12px' } }, selector, toggle,
+      h('select', { class: 'preview-device', hidden: true })), preview);
+  syncPreviewDeviceSelectors();
 }
 
 const t = (k, v) => (window.PhoneBoxI18n ? window.PhoneBoxI18n.t(k, v) : k);
@@ -3621,6 +3803,8 @@ let catalogRaw = null;
 function localizeCatalog() {
   if (!catalogRaw) return;
   catalog = JSON.parse(JSON.stringify(catalogRaw));
+  catalog.cols = catalog.cols || 12;
+  catalog.maxRows = catalog.maxRows || 18;
   for (const w of catalog.widgets) {
     w.name = tc(w.name);
     w.desc = tc(w.desc);
@@ -3838,6 +4022,7 @@ async function loadInfo() {
     pill.className = 'pill' + (i.connected ? ' on' : '');
     pill.querySelector('span').textContent = i.connected ? t('s.conn.connected') + (i.via ? ' · ' + i.via : '') : t('s.conn.notConnected');
     osName = i.os || 'windows';
+    if ($('phoneMicCard')) { $('phoneMicCard').hidden = osName !== 'windows'; if (osName === 'windows') renderPhoneMicState(); }
     $('followComputerLockOption').style.display = osName === 'macos' ? '' : 'none';
     $('adbFound').textContent = i.adb ? t('s.conn.adbFound', { path: i.adb }) : t('s.conn.adbNotFound') + ' — ' + ({ linux: 'sudo apt install adb', macos: 'brew install android-platform-tools' }[osName] || 'winget install Google.PlatformTools');
     $('appMissing').hidden = !(i.appMissing && i.appMissing.length);
@@ -3861,11 +4046,12 @@ async function loadInfo() {
     $('restartBtn').hidden = !lan.restartNeeded;
     renderUpdate(await (await fetch('/api/update')).json());
     renderWebhooks(lan);
-    const [claudeHook, codexHook] = await Promise.all([
+    const [claudeHook, codexHook, workbuddyHook] = await Promise.all([
       fetch('/api/claude/hook').then((r) => r.json()),
       fetch('/api/codex/hook').then((r) => r.json()),
+      fetch('/api/workbuddy/hook').then((r) => r.json()),
     ]);
-    for (const [name, hk] of [['claude', claudeHook], ['codex', codexHook]]) {
+    for (const [name, hk] of [['claude', claudeHook], ['codex', codexHook], ['workbuddy', workbuddyHook]]) {
       $(`${name}HookState`).textContent = hk.installed ? t('s.claude.installedIn', { path: hk.path }) : t('s.claude.notInstalled');
       const btn = $(`${name}HookBtn`);
       btn.dataset.i18n = hk.installed ? 's.claude.removeHook' : 's.claude.installHook';
@@ -3888,7 +4074,7 @@ function fillDefaults() {
   cfg.pages = fitPages(cfg.pages); cfg.shortcuts ??= []; cfg.rules ??= []; cfg.display ??= {}; cfg.night = { enabled: true, start: '00:30', end: '07:30', brightness: 0.02, ...cfg.night }; cfg.weather ??= {}; cfg.weather.unit ??= 'celsius'; cfg.weather.model ??= ''; cfg.photos ??= { source: 'folder', folder: '', subfolders: true, immichUrl: '', immichKey: '', immichAlbum: '', immichAlbumName: '' }; cfg.lan ??= { enabled: false, port: 8766 }; cfg.updates ??= { auto: true, repo: 'ersinkoc/phonebox' }; cfg.claude ??= { phoneApprovals: true, timeoutSec: 90, onlyWhenAway: false, shareSessionTitles: false, shareConversation: false }; cfg.opencode ??= { phoneApprovals: false, timeoutSec: 90, onlyWhenAway: false, alwaysCountdownSec: 10, watchWsl: false, shareSessionTitles: false, sessions: false };
   cfg.codexBar ??= { providers: ['claude', 'codex', 'antigravity'], rotate: true, pageSize: 2, rotateInterval: 8 };
   for (const [k, v] of Object.entries({ language: 'auto', hour12: false, idleReturnSec: 90, switchCountdownSec: 3, touchGraceSec: 20, minDwellSec: 15, holdMaxMin: 30, keepAwake: true, openOnConnect: true,
-    showSeconds: true, vibrate: true, finishToast: true, volumeKeys: true, artTint: true, nightWhenUnreachable: false, unreachableNightDelayMin: 5, proximityWake: true, orientation: 'landscape', theme: 'default', accent: '#2dd4bf',
+    showSeconds: true, vibrate: true, finishToast: true, volumeKeys: true, artTint: true, nightWhenUnreachable: false, unreachableNightDelayMin: 5, proximityWake: true, orientation: 'landscape', tabletRows: false, theme: 'default', accent: '#2dd4bf',
     background: 'solid', cardFill: 'none', frameColor: '#9aa3ad', frameOpacity: 28, oceanDetail: 'high', oceanFish: 140, oceanFps: 24, oceanOpacity: 70, oceanStill: false, oceanPowerSaver: false, idleBlack: false, idleDimMin: 0 })) cfg.display[k] ??= v;
   const idleDimMin = Number(cfg.display.idleDimMin);
   if (!Number.isInteger(idleDimMin) || ![0, 1, 2, 5, 10, 15].includes(idleDimMin)) {
@@ -3906,6 +4092,7 @@ function fillDefaults() {
   if (!Array.isArray(cfg.display.koiColours) || !cfg.display.koiColours.length) cfg.display.koiColours = [...OCEAN_KOI_DEFAULTS];
   cfg.charge ??= { enabled: false, min: 50, max: 80, method: 'ha' };
   cfg.steam ??= { enabled: false };
+  cfg.workBuddy = { sessions: false, phoneApprovals: false, onlyWhenAway: false, timeoutSec: 90, ...cfg.workBuddy };
 }
 
 async function load() {
@@ -4031,12 +4218,14 @@ $('restartBtn').onclick = async () => {
   };
   setTimeout(wait, 1500);
 };
-for (const name of ['codex', 'claude']) $(`${name}HookBtn`).onclick = async () => {
+for (const name of ['codex', 'claude', 'workbuddy']) $(`${name}HookBtn`).onclick = async () => {
+  // 安装器使用已保存的设置，先保存才能安装。
+  if (JSON.stringify(cfg) !== saved) { toast(t('s.js.saveFirst'), true); return; }
   const btn = $(`${name}HookBtn`), remove = !!btn.dataset.installed;
   const r = await fetch(`/api/${name}/hook`, { method: remove ? 'DELETE' : 'POST' });
   const j = await r.json().catch(() => ({}));
   const successKey = remove ? 's.approvals.hookRemoved' : name === 'codex' ? 's.approvals.codexHookInstalled' : 's.approvals.hookInstalled';
-  r.ok ? toast(t(successKey, { agent: name === 'codex' ? 'Codex' : 'Claude Code' }))
+  r.ok ? toast(t(successKey, { agent: { codex: 'Codex', workbuddy: 'WorkBuddy' }[name] || 'Claude Code' }))
     : toast(j.error || t('s.approvals.hookError'), true);
   loadInfo();
 };
