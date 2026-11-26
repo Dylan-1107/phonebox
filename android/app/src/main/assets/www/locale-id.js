@@ -430,6 +430,8 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.oled.title": "OLED perlindungan terbakar",
       "s.oled.pixelShift": "Pindah panel beberapa piksel setiap 2 menit, dan jam malam di sekitar layar",
       "s.oled.idleDim": "Menutup panel setelah (menit tanpa sentuh, 0 = tidak pernah)",
+      "s.display.oceanPowerSaver": "Animasi hemat daya (24 fps, 80 ikan)",
+      "s.oled.idleBlack": "Saat tidak aktif, turunkan kecerahan dan tampilkan hitam pekat",
       "s.oled.lead": "Untuk layar OLED yang menampilkan halaman yang sama selama berjam-jam. Tema hitam AMOLED dan layar malam juga membantu.",
       "s.oled.idleDimHint": "Sentuh membuatnya terang lagi tanpa menekan apapun; jadi lakukan pengganti halaman, pemberitahuan dan prompt izin.",
       "s.weather.openMeteoHint": "Ponsel meminta Open-Meteo untuk lokasi ini hanya ketika halaman memiliki widget yang menggunakan cuaca (waktu, ramalan, matahari dan bulan, jam dengan garis cuacanya, HTML Custom).",

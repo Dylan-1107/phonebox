@@ -227,6 +227,8 @@ public sealed class DisplayConfig
     public int OceanOpacity { get; set; } = 70;
     /// <summary>Draw one settled frame and stop, instead of animating (saves power on a weak tablet).</summary>
     public bool OceanStill { get; set; }
+    /// <summary>采用实测海洋动画省电档：24 帧、电池精细度、80 条鱼。</summary>
+    public bool OceanPowerSaver { get; set; }
     /// <summary>Screen brightness follows the room (the phone's light sensor).</summary>
     public bool AutoBrightness { get; set; }
     /// <summary>Show the night screen whenever the room is dark, not only at night.</summary>
@@ -247,6 +249,8 @@ public sealed class DisplayConfig
     public string PageBarSide { get; set; } = "bottom";
     /// <summary>OLED burn-in protection: dim the panel after this many minutes without a touch; 0 = never.</summary>
     public int IdleDimMin { get; set; }
+    /// <summary>闲置时将屏幕亮度降至最低附近，并覆盖纯黑画面。</summary>
+    public bool IdleBlack { get; set; }
     /// <summary>Screen pinning: Home and Recents stay on the panel.</summary>
     public bool Pin { get; set; }
     /// <summary>The panel is the phone's home app: it starts after a reboot and Home returns to it.</summary>

@@ -430,6 +430,8 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.oled.title": "OLED 버닝 보호",
       "s.oled.pixelShift": "2분마다 몇 개의 픽셀로 패널을 이동하고, 화면 주위에 밤 시계",
       "s.oled.idleDim": "패널 어둡게 하기(터치 없이 분, 0 = 사용 안 함)",
+      "s.display.oceanPowerSaver": "절전 애니메이션(24fps, 물고기 80마리)",
+      "s.oled.idleBlack": "유휴 상태에서 밝기를 낮추고 순수한 검정 화면 표시",
       "s.oled.lead": "시간 동안 같은 페이지를 보여주는 OLED 스크린을 위해. AMOLED 블랙 테마와 야간 화면도 도움이됩니다.",
       "s.oled.idleDimHint": "터치 한번으로 아무것도 누르지 않고 다시 밝아집니다. 페이지 스위치, 알림 및 권한 프롬프트도 마찬가지입니다.",
       "s.weather.openMeteoHint": "페이지가 날씨를 사용하는 위젯 (날씨, 예보, 태양 & 달, 그것의 날씨 선과 시계, 사용자 정의 HTML)을 가지고있는 동안 전화는 오픈 - 메테오에 대한이 위치에 대해 요청합니다.",

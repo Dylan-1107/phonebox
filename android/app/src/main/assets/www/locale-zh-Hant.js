@@ -430,6 +430,8 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.oled.title": "OLED的燒損保護",
       "s.oled.pixelShift": "每隔兩分鐘移動面板幾個像素，並在屏幕上放置夜間時鐘",
       "s.oled.idleDim": "過後減暗面板 (不觸摸分鐘,0=從來沒有)",
+      "s.display.oceanPowerSaver": "省電動畫檔（24 fps、80 條魚）",
+      "s.oled.idleBlack": "閒置時降低亮度並切換為純黑畫面",
       "s.oled.lead": "对于OLED屏幕显示同一页数小时. AMOLED黑色主题和夜间屏幕也有帮助.",
       "s.oled.idleDimHint": "觸摸一下就會亮起來，不用按任何東西；同樣也可以切換頁面、通知和權限提示。",
       "s.weather.openMeteoHint": "只有在頁面有使用天氣的小部件(天氣、預報、太陽和月亮、帶有天氣線的時鐘、自定義 HTML)時,手機才會要求 Open-Meteo 提供此位置。",

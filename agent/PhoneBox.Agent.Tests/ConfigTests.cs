@@ -88,6 +88,14 @@ public class ConfigTests
         var defaults = Load("{}").Display;
         Assert.False(defaults.PixelShift);
         Assert.Equal(0, defaults.IdleDimMin);
+        Assert.False(defaults.IdleBlack);
+        Assert.False(defaults.OceanPowerSaver);
+        var power = Load("""{ "display": { "idleBlack": true, "oceanPowerSaver": true } }""").Display;
+        Assert.True(power.IdleBlack);
+        Assert.True(power.OceanPowerSaver);
+        var publicDisplay = JsonSerializer.SerializeToElement(Load("""{ "display": { "idleBlack": true, "oceanPowerSaver": true } }""").ToPublic(), ConfigStore.WriteOpts).GetProperty("display");
+        Assert.True(publicDisplay.GetProperty("idleBlack").GetBoolean());
+        Assert.True(publicDisplay.GetProperty("oceanPowerSaver").GetBoolean());
         Assert.Equal(1440, Load("""{ "display": { "pixelShift": true, "idleDimMin": 99999 } }""").Display.IdleDimMin);
         Assert.Equal(0, Load("""{ "display": { "idleDimMin": -5 } }""").Display.IdleDimMin);
         Assert.True(Load("""{ "display": { "pixelShift": true } }""").Display.PixelShift);

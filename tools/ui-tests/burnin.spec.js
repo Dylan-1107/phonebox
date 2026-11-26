@@ -85,3 +85,46 @@ test('a page switch waiting behind the open overview does not keep the panel fro
   await page.clock.fastForward(61_000);
   await expect(page.locator('body')).toHaveClass(/dimmed/);
 });
+
+test('idle black mode blanks the panel and pauses the ocean until the wake tap', async ({ page }) => {
+  await show(page, { idleDimMin: 1, idleBlack: true, background: 'sharks' });
+  await page.clock.fastForward(61_000);
+  await expect(page.locator('body')).toHaveClass(/dimmed/);
+  await expect(page.locator('body')).toHaveClass(/idle-black/);
+  await expect(page.locator('#ocean')).toHaveCSS('display', 'none');
+  await page.waitForTimeout(1600);
+  expect(await page.evaluate(() => getComputedStyle(document.body, '::after').opacity)).toBe('1');
+  const all = await page.locator('#dots .page-all').boundingBox();
+  await page.mouse.click(all.x + all.width / 2, all.y + all.height / 2);
+  await expect(page.locator('body')).not.toHaveClass(/dimmed/);
+  await expect(page.locator('#overview')).toBeHidden();
+});
+
+test('the ocean saver overrides render cost and restores the saved custom profile', async ({ page }) => {
+  await show(page, {});
+  const profiles = await page.evaluate(async () => {
+    const { oceanRenderSettings } = await import('/panel/main.js');
+    return [
+      oceanRenderSettings({ oceanPowerSaver: true, oceanFps: 60, oceanDetail: 'high', oceanFish: 400 }),
+      oceanRenderSettings({ oceanPowerSaver: true, oceanFps: 60, oceanDetail: 'high', oceanFish: 400 }, false),
+      oceanRenderSettings({ oceanPowerSaver: false, oceanFps: 45, oceanDetail: 'balanced', oceanFish: 210 }),
+    ];
+  });
+  expect(profiles).toEqual([
+    { fps: 24, detail: 'battery', fish: 80 },
+    { fps: 60, detail: 'high', fish: 400 },
+    { fps: 45, detail: 'balanced', fish: 210 },
+  ]);
+});
+
+test('power settings have translated labels in every supported language', async ({ page }) => {
+  await page.goto('/panel/');
+  const missing = await page.evaluate(() => {
+    const { LANGUAGES, STRINGS } = window.PhoneBoxI18n;
+    const keys = ['s.display.oceanPowerSaver', 's.oled.idleBlack'];
+    return LANGUAGES.flatMap(({ code }) => keys
+      .filter((key) => !STRINGS[code]?.[key]?.trim())
+      .map((key) => `${code}:${key}`));
+  });
+  expect(missing).toEqual([]);
+});

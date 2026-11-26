@@ -430,6 +430,8 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.oled.title": "Ochrana proti spálení OLED",
       "s.oled.pixelShift": "Posuňte panel o několik pixelů každé 2 minuty a noční hodiny kolem obrazovky",
       "s.oled.idleDim": "Ztlumení panelu po (minutách bez dotyku, 0 = nikdy)",
+      "s.display.oceanPowerSaver": "Úsporná animace (24 sn./s, 80 ryb)",
+      "s.oled.idleBlack": "Při nečinnosti snížit jas a zobrazit čistě černou",
       "s.oled.lead": "Pro OLED obrazovky, které zobrazují stejnou stránku po celé hodiny, pomáhá také černý motiv AMOLED a noční obrazovka.",
       "s.oled.idleDimHint": "Dotykem ji opět rozsvítíte, aniž byste cokoli stiskli; stejně tak přepnutí stránky, oznámení a výzva k povolení.",
       "s.weather.openMeteoHint": "Telefon požádá Open-Meteo o tuto polohu pouze tehdy, když stránka má widget, který používá počasí (počasí, předpověď, slunce a měsíc, hodiny s jeho počasí čáry, Custom HTML).",

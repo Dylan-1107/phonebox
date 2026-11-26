@@ -729,6 +729,7 @@ nav a.on::before { color: var(--accent); }
           <div class="row" style="gap:16px;margin-bottom:8px;align-items:flex-end;flex-wrap:wrap">
             <div class="field" style="margin:0"><label data-i18n="s.display.oceanFish">Fish</label><input type="number" min="0" max="400" data-bind="display.oceanFish" data-type="int" style="width:90px"></div>
             <label class="check" style="margin-bottom:8px"><input type="checkbox" data-bind="display.oceanStill"> <span data-i18n="s.display.oceanStill">One still frame instead of animating (saves power)</span></label>
+            <label class="check" style="margin-bottom:8px"><input type="checkbox" data-bind="display.oceanPowerSaver"> <span data-i18n="s.display.oceanPowerSaver">Low-power animation (24 fps, 80 fish)</span></label>
           </div>
           <span class="hint" style="display:block;margin-top:2px" data-i18n="s.display.oceanHint">Pure black with no grid, so the screen keeps its OLED black. The scene pauses with the night screen and while the panel is dimmed.</span>
         </div>
@@ -785,8 +786,9 @@ nav a.on::before { color: var(--accent); }
         <h3 data-i18n="s.oled.title">OLED burn-in protection</h3>
         <p class="hint" style="margin:0 0 12px" data-i18n="s.oled.lead">For OLED screens that show the same page for hours. The AMOLED black theme and the night screen help too.</p>
         <label class="check"><input type="checkbox" data-bind="display.pixelShift"> <span data-i18n="s.oled.pixelShift">Move the panel by a few pixels every 2 minutes, and the night clock around the screen</span></label>
-        <div class="field" style="max-width:420px;margin-top:8px"><label data-i18n="s.oled.idleDim">Dim the panel after (minutes without a touch, 0 = never)</label><input type="number" min="0" max="1440" data-bind="display.idleDimMin" data-type="int">
+        <div class="field" style="max-width:420px;margin-top:8px"><label data-i18n="s.oled.idleDim">Dim the panel after (minutes without a touch, 0 = never)</label><select id="idleDimMin" data-bind="display.idleDimMin" data-type="int"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="5">5</option><option value="10">10</option><option value="15">15</option></select>
           <span class="hint" data-i18n="s.oled.idleDimHint">A touch brightens it again without pressing anything; so do a page switch, a notification and a permission prompt.</span></div>
+        <label class="check"><input type="checkbox" data-bind="display.idleBlack"> <span data-i18n="s.oled.idleBlack">At idle, lower brightness and show pure black</span></label>
       </div>
 
       <div class="card">
@@ -3887,7 +3889,11 @@ function fillDefaults() {
   cfg.codexBar ??= { providers: ['claude', 'codex', 'antigravity'], rotate: true, pageSize: 2, rotateInterval: 8 };
   for (const [k, v] of Object.entries({ language: 'auto', hour12: false, idleReturnSec: 90, switchCountdownSec: 3, touchGraceSec: 20, minDwellSec: 15, holdMaxMin: 30, keepAwake: true, openOnConnect: true,
     showSeconds: true, vibrate: true, finishToast: true, volumeKeys: true, artTint: true, nightWhenUnreachable: false, unreachableNightDelayMin: 5, proximityWake: true, orientation: 'landscape', theme: 'default', accent: '#2dd4bf',
-    background: 'solid', cardFill: 'none', frameColor: '#9aa3ad', frameOpacity: 28, oceanDetail: 'high', oceanFish: 140, oceanFps: 24, oceanOpacity: 70, oceanStill: false })) cfg.display[k] ??= v;
+    background: 'solid', cardFill: 'none', frameColor: '#9aa3ad', frameOpacity: 28, oceanDetail: 'high', oceanFish: 140, oceanFps: 24, oceanOpacity: 70, oceanStill: false, oceanPowerSaver: false, idleBlack: false, idleDimMin: 0 })) cfg.display[k] ??= v;
+  const idleDimMin = Number(cfg.display.idleDimMin);
+  if (!Number.isInteger(idleDimMin) || ![0, 1, 2, 5, 10, 15].includes(idleDimMin)) {
+    $('idleDimMin').append(h('option', { value: String(cfg.display.idleDimMin) }, String(cfg.display.idleDimMin)));
+  }
   // the five muted defaults; the real list comes back from the agent once it is saved
   cfg.display.oceanSharks ??= [
     { kind: 'whale', color: '#a9c7e8' }, { kind: 'greathammer', color: '#d9c8a6' },

@@ -78,7 +78,7 @@ export const FALLBACK_PAGES = [{
 export const DEFAULT_CFG = {
   weather: { city: 'Tallinn', lat: 59.437, lon: 24.745, unit: 'celsius', model: '' },
   night: { enabled: true, start: '00:30', end: '07:30', brightness: 0.02 },
-  display: { showSeconds: true, idleReturnSec: 90, vibrate: true, finishToast: true, volumeKeys: true, nightWhenUnreachable: false, unreachableNightDelayMin: 5, pageBar: 'dots', pageBarSide: 'bottom' },
+  display: { showSeconds: true, idleReturnSec: 90, vibrate: true, finishToast: true, volumeKeys: true, nightWhenUnreachable: false, unreachableNightDelayMin: 5, pageBar: 'dots', pageBarSide: 'bottom', idleBlack: false, oceanPowerSaver: false },
   opencode: { alwaysCountdownSec: 10 },
   pages: FALLBACK_PAGES,
   shortcuts: [],
@@ -2333,6 +2333,7 @@ pager.addEventListener('touchcancel', () => { swipeTracking = false; }, { passiv
 
 /** Called by the Android shell (volume keys) and by arrow keys in a desktop browser. */
 window.onAndroidKey = (k) => {
+  undim();
   lastTouch = lastUserTouch = Date.now();
   if (nightOn) { wakeUntil = Date.now() + 30_000; setNight(false); return; }
   if (!$('overview').hidden) closeOverview();
@@ -2425,7 +2426,8 @@ export function applyBrightness(force = false) {
   let v = -1; // the phone's own setting
   if (nightOn) v = cfg.night?.brightness ?? 0.02;
   else if (cfg.display?.autoBrightness && lux != null) v = luxToBrightness(lux);
-  if (!force && lastBrightness != null && v >= 0 && lastBrightness >= 0 && Math.abs(v - lastBrightness) < 0.04) return;
+  if (dimmed && cfg.display?.idleBlack === true) v = 0.01;
+  if (!force && lastBrightness != null && lastBrightness >= 0 && v >= 0 && Math.abs(v - lastBrightness) < 0.04) return;
   lastBrightness = v;
   try { bridge.setBrightness(v); } catch (_) {}
 }
@@ -2456,13 +2458,16 @@ const SHIFT_MS = 120_000;
 let shiftStep = -1;
 let lastWake = Date.now();
 let dimmed = false;
+let idleBlackOn = false;
 
 /** Something happened that the user should see: brighten a dimmed panel and restart its idle time. */
 export function undim() {
   lastWake = Date.now();
   if (!dimmed) return;
   dimmed = false;
-  document.body.classList.remove('dimmed');
+  idleBlackOn = false;
+  document.body.classList.remove('dimmed', 'idle-black');
+  applyBrightness(true);
 }
 
 // The dark layer keeps catching this touch until the finger lifts, so the widget under it is not pressed.
@@ -2497,9 +2502,13 @@ export function applyBurnIn() {
   const after = Math.max(0, Math.floor(+d.idleDimMin || 0)) * 60_000;
   const dim = after > 0 && !PREVIEW && !nightOn && $('approval').hidden
     && Date.now() - Math.max(lastTouch, lastNav, lastWake) > after;
-  if (dim !== dimmed) {
+  const black = dim && d.idleBlack === true;
+  document.body.classList.toggle('idle-black', black);
+  if (dim !== dimmed || black !== idleBlackOn) {
     dimmed = dim;
+    idleBlackOn = black;
     document.body.classList.toggle('dimmed', dim);
+    applyBrightness(true);
   }
 }
 
@@ -2559,6 +2568,18 @@ const OCEAN_DETAIL = Object.freeze({
   balanced: { dpr: 1.5, cellScale: 1 },
   battery: { dpr: 1, cellScale: 1.25 },
 });
+
+export function oceanRenderSettings(d = {}, allowSaver = true) {
+  const saver = allowSaver && d.oceanPowerSaver === true;
+  const rawFps = d.oceanFps == null ? 24 : Number(d.oceanFps);
+  const rawFish = d.oceanFish == null ? 140 : Number(d.oceanFish);
+  return {
+    fps: saver ? 24 : Math.max(24, Math.min(60, Math.round(Number.isFinite(rawFps) ? rawFps : 24))),
+    detail: saver ? 'battery' : (OCEAN_DETAIL[d.oceanDetail] ? d.oceanDetail : 'high'),
+    fish: saver ? 80 : Math.max(0, Math.min(400, Math.round(Number.isFinite(rawFish) ? rawFish : 140))),
+  };
+}
+
 let backdrop = null, backdropKind = '', backdropKey = '', backdropGen = 0, backdropPause = null;
 const backdropModules = {};
 
@@ -2583,9 +2604,9 @@ async function applyBackdrop(d) {
   const rawOpacity = d.oceanOpacity == null ? 70 : Number(d.oceanOpacity);
   const opacity = Math.max(20, Math.min(100, Math.round(Number.isFinite(rawOpacity) ? rawOpacity : 70)));
   const dim = Math.max(0, Math.min(0.85, 1 - opacity / 100));
-  const rawFps = d.oceanFps == null ? 24 : Number(d.oceanFps);
-  const fps = Math.max(24, Math.min(60, Math.round(Number.isFinite(rawFps) ? rawFps : 24)));
-  const detail = OCEAN_DETAIL[d.oceanDetail] || OCEAN_DETAIL.high;
+  // 省电开关只在鲨鱼设置中出现；切到锦鲤或水母时不应隐式覆盖它们的动画参数。
+  const { fps, detail: detailName, fish: profileFish } = oceanRenderSettings(d, kind === 'sharks');
+  const detail = OCEAN_DETAIL[detailName];
   const canvas = document.getElementById('ocean');
   let key;
 
@@ -2593,10 +2614,9 @@ async function applyBackdrop(d) {
     const list = (Array.isArray(d.oceanSharks) && d.oceanSharks.length ? d.oceanSharks : DEFAULT_OCEAN_SHARKS).slice(0, 8);
     const cast = list.map((s, i) => ({ kind: OCEAN_KINDS.includes(s?.kind) ? s.kind : 'classic', size: OCEAN_SIZES[i] || 0.72 }));
     const colors = list.map((s) => oceanColor(s?.color));
-    const rawFish = d.oceanFish == null ? 140 : Number(d.oceanFish);
-    const fish = Math.max(0, Math.min(400, Math.round(Number.isFinite(rawFish) ? rawFish : 140)));
+    const fish = profileFish;
     const still = d.oceanStill === true;
-    key = [JSON.stringify(list), fish, fps, still, dim, d.oceanDetail].join('|');
+    key = [JSON.stringify(list), fish, fps, still, dim, detailName].join('|');
     if (backdrop && kind === backdropKind && key === backdropKey) return;
     stopBackdrop();
     const gen = ++backdropGen;
@@ -2618,7 +2638,7 @@ async function applyBackdrop(d) {
     const colours = custom
       ? Array.from({ length: count }, (_, i) => (Array.isArray(d.koiColours) && d.koiColours[i]) || DEFAULT_KOI_COLOURS[i % DEFAULT_KOI_COLOURS.length])
       : [];
-    key = [count, custom, JSON.stringify(colours), fps, dim, d.oceanDetail].join('|');
+    key = [count, custom, JSON.stringify(colours), fps, dim, detailName].join('|');
     if (backdrop && kind === backdropKind && key === backdropKey) return;
     stopBackdrop();
     const gen = ++backdropGen;
@@ -2640,7 +2660,7 @@ async function applyBackdrop(d) {
     } catch (_) { return; }
   } else {
     const count = Math.max(1, Math.min(8, Math.round(Number(d.jellyCount) || 4)));
-    key = [count, fps, dim, d.oceanDetail].join('|');
+    key = [count, fps, dim, detailName].join('|');
     if (backdrop && kind === backdropKind && key === backdropKey) return;
     stopBackdrop();
     const gen = ++backdropGen;
@@ -2907,7 +2927,7 @@ export const idle = () => appPaused || document.hidden;
 window.onAppPause = (paused) => {
   const was = idle();
   appPaused = !!paused;
-  if (was && !idle()) wokeUp();
+  if (was && !idle()) { undim(); wokeUp(); }
 };
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !appPaused) wokeUp(); });
 // what the paused panel skipped is fetched at once, not at the next interval

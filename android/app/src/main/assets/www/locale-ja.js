@@ -430,6 +430,8 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.oled.title": "OLEDバーンイン保護",
       "s.oled.pixelShift": "パネルを2分ごとに数ピクセル移動し、スクリーンの周りの夜間時計を動かします",
       "s.oled.idleDim": "パネルを暗くする時間 (タッチなしで分、0 = 決して)",
+      "s.display.oceanPowerSaver": "省電力アニメーション（24 fps、魚80匹）",
+      "s.oled.idleBlack": "アイドル時に輝度を下げ、純粋な黒を表示",
       "s.oled.lead": "OLEDスクリーンは、同じページを何時間も表示するために。AMOLEDブラックテーマと夜間スクリーンも役立ちます。",
       "s.oled.idleDimHint": "何も押さないでタッチすると明るくなり、ページスイッチや通知、許可プロンプトも同様です。",
       "s.weather.openMeteoHint": "電話は Open-Meteo にこの場所を問い合わせるのは、ページが天気を使ったウィジェット（天気、予報、日月、時計と天気線、カスタム HTML）を持っている場合のみです。",
